@@ -30,4 +30,5 @@ coverage.xml
 
 # Misc
 .DS_Store
-
+.gitignore
+.idea/
