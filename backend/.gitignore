@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+*.env
+
+# Local environment files
+.env
+
+# Logs and local database
+*.log
+*.sqlite3
+*.db
+
+# Testing outputs
+.coverage
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# IDE and editor settings
+.idea/
+.vscode/
+*.swp
+
+# Misc
+.DS_Store
+
