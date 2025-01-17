@@ -22,6 +22,7 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.2",
     "react-scripts": "^5.0.1",
+    "react-toastify": "^11.0.3",
     "redux-devtools-extension": "^2.13.9",
     "styled-components": "^6.1.14",
     "web-vitals": "^2.1.0",

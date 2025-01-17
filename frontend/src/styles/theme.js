@@ -11,6 +11,9 @@ const darkTheme = {
         size: "16px",
         weight: "400",
     },
+        shadows: {
+        default: "0px 4px 6px rgba(0, 0, 0, 0.1)",
+    },
     spacing: (factor) => `${factor * 8}px`, // 8px grid spacing
 };
 

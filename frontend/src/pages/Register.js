@@ -1,46 +1,35 @@
 import React, { useState } from "react";
-import axios from "axios";
+import AccountCreation from "./Registration/AccountCreation";
+import EmailVerification from "./Registration/EmailVerification";
+import ProfileCompletion from "./Registration/ProfileCompletion";
+import SubscriptionSelection from "./Registration/SubscriptionSelection";
+import styled from "styled-components";
+
+const RegisterContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #121212, #1f1f1f);
+  color: #fff;
+`;
 
 const Register = () => {
-    const [formData, setFormData] = useState({
-        username: "",
-        email: "",
-        password: "",
-    });
+  const [step, setStep] = useState(1);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            await axios.post("/api/auth/register", formData);
-            alert("Registration successful!");
-        } catch (err) {
-            alert("Error during registration");
-        }
-    };
+  const handleNextStep = () => {
+    setStep((prev) => prev + 1);
+  };
 
-    return (
-        <form onSubmit={handleSubmit}>
-            <input
-                type="text"
-                placeholder="Username"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-            />
-            <input
-                type="email"
-                placeholder="Email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-            <input
-                type="password"
-                placeholder="Password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            />
-            <button type="submit">Register</button>
-        </form>
-    );
+  return (
+    <RegisterContainer>
+      {step === 1 && <AccountCreation onNext={handleNextStep} />}
+      {step === 2 && <EmailVerification onNext={handleNextStep} />}
+      {step === 3 && <ProfileCompletion onNext={handleNextStep} />}
+      {step === 4 && <SubscriptionSelection />}
+    </RegisterContainer>
+  );
 };
 
 export default Register;

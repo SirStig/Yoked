@@ -23,11 +23,11 @@ const MainContent = styled.main`
 
 const MainLayout = () => (
     <div>
-        <Header>Fitness Foundry</Header>
+        <Header>Yoked</Header>
         <MainContent>
             <Outlet />
         </MainContent>
-        <Footer>© 2025 Fitness Foundry. All rights reserved.</Footer>
+        <Footer>© 2025 Yoked. All rights reserved.</Footer>
     </div>
 );
 
