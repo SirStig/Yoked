@@ -1,26 +1,26 @@
 from pydantic import BaseModel
 from typing import List
 
-class CommentBase(BaseModel):
+class ReelCommentBase(BaseModel):
     content: str
 
-class CommentOut(CommentBase):
+class ReelCommentOut(ReelCommentBase):
     id: int
-    post_id: int
+    reel_id: int
     author_id: int
 
     class Config:
         orm_mode = True
 
-class PostBase(BaseModel):
-    title: str
-    content: str
+class ReelBase(BaseModel):
+    url: str
+    description: str
 
-class PostOut(PostBase):
+class ReelOut(ReelBase):
     id: int
     author_id: int
     likes: int
-    comments: List[CommentOut] = []
+    comments: List[ReelCommentOut] = []
 
     class Config:
         orm_mode = True
