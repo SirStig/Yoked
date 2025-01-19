@@ -1,20 +1,35 @@
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
-from sqlalchemy.orm import Session
-from jose import jwt, JWTError
 from datetime import datetime, timedelta
+
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import RedirectResponse
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+from jose import jwt
+from sqlalchemy.orm import Session
 from backend.core.database import get_db
-from backend.api.auth.auth_service import create_user, get_user_by_username, hash_password, verify_password
-from backend.schemas.user_schema import UserCreate, Token
+from backend.api.auth.auth_service import (
+    create_user,
+    get_user_by_username,
+    hash_password,
+    get_current_user,
+    verify_password, get_user_by_email,
+)
+from backend.schemas.user_schema import UserCreate, Token, LoginRequest
 from backend.core.config import settings
-from backend.core.aws_utils import upload_file_to_s3
-from backend.models.user import User
-from pydantic import BaseModel, EmailStr
-import logging
+from backend.services.session_service import (
+    create_session,
+    validate_session,
+    invalidate_session,
+    invalidate_specific_session,
+)
+from backend.models.user import User, SetupStep  # Importing User model
+from backend.core.logging_config import get_logger
+from uuid import UUID  # Ensure proper handling of UUIDs
 
-from backend.services.session_service import create_session
+# Logger setup
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
+# Router setup
+router = APIRouter()
 
 # JWT Configuration
 SECRET_KEY = settings.SECRET_KEY
@@ -30,118 +45,190 @@ conf = ConnectionConfig(
     MAIL_SERVER=settings.MAIL_SERVER,
     MAIL_STARTTLS=settings.MAIL_STARTTLS,
     MAIL_SSL_TLS=settings.MAIL_SSL_TLS,
-    USE_CREDENTIALS=settings.USE_CREDENTIALS
+    USE_CREDENTIALS=settings.USE_CREDENTIALS,
 )
 
 # Base URL for dynamic link generation
 BASE_URL = settings.BASE_URL
+FRONTEND_BASE_URL = settings.FRONTEND_URL
 
-router = APIRouter()
 
 # Helper function to send emails
 async def send_email(subject: str, recipient: str, body: str):
+    logger.debug("Preparing to send email")
     try:
         message = MessageSchema(
             subject=subject,
             recipients=[recipient],
             body=body,
-            subtype="html"
+            subtype="html",
         )
         fm = FastMail(conf)
         await fm.send_message(message)
         logger.info(f"Email sent to {recipient}")
     except Exception as e:
-        logger.error(f"Failed to send email to {recipient}: {e}")
+        logger.exception(f"Failed to send email to {recipient}: {e}")
         raise HTTPException(status_code=500, detail="Email sending failed")
+
 
 # Route: Register user with email verification
 @router.post("/register", response_model=Token)
 async def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    existing_user = get_user_by_username(db, user.username)
-    if existing_user:
-        logger.warning(f"Registration attempt with existing username: {user.username}")
-        raise HTTPException(status_code=400, detail="Username already registered")
+    if not user.accepted_privacy_policy or not user.accepted_terms:
+        raise HTTPException(status_code=400, detail="User must accept terms and conditions")
 
-    new_user = create_user(db, user)
-    token_data = {"sub": new_user.username, "type": "email_verification"}
-    token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
-    verification_link = f"{BASE_URL}/api/auth/verify-email?token={token}"
-    email_body = f"Click the link to verify your email: <a href='{verification_link}'>{verification_link}</a>"
-
-    await send_email("Verify Your Email", user.email, email_body)
-    logger.info(f"Verification email sent to {user.email}")
-
-    return {"access_token": token, "token_type": "bearer"}
-
-# Route: Verify email
-@router.get("/verify-email")
-async def verify_email(token: str, db: Session = Depends(get_db)):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("type") != "email_verification":
-            logger.warning(f"Invalid token type for email verification")
-            raise HTTPException(status_code=400, detail="Invalid token type")
+        existing_user = get_user_by_username(db, user.username)
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already registered")
 
-        username = payload.get("sub")
-        user = get_user_by_username(db, username)
-        if not user:
-            logger.error(f"Email verification failed: User {username} not found")
-            raise HTTPException(status_code=404, detail="User not found")
+        new_user = create_user(db, user)
+        new_user.setup_step = SetupStep.email_verification
 
-        logger.info(f"Email verified for user {username}")
-        return {"message": "Email verified successfully"}
-    except JWTError as e:
-        logger.error(f"Token verification failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
+        token_data = {"sub": str(new_user.id), "type": "email_verification"}
 
-# Route: Password reset request
-@router.post("/password-reset")
-async def password_reset_request(email: EmailStr, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == email).first()
-    if not user:
-        logger.warning(f"Password reset requested for non-existent email: {email}")
-        raise HTTPException(status_code=404, detail="User not found")
+        verification_token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
-    token_data = {"sub": user.username, "type": "password_reset"}
-    token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
-    reset_link = f"{BASE_URL}/api/auth/reset-password?token={token}"
-    email_body = f"Click the link to reset your password: <a href='{reset_link}'>{reset_link}</a>"
+        session_token = create_session(new_user.id, db)
 
-    await send_email("Password Reset", email, email_body)
-    logger.info(f"Password reset email sent to {email}")
+        verification_link = f"{settings.BASE_URL}/api/auth/verify-email?token={verification_token}"
+        email_body = f"Click the link to verify your email: <a href='{verification_link}'>{verification_link}</a>"
+        await send_email("Verify Your Email", user.email, email_body)
 
-    return {"message": "Password reset email sent"}
+        return {"access_token": session_token, "token_type": "bearer", "status": "pending"}
 
-# Route: Reset password
-@router.post("/reset-password")
-async def reset_password(token: str, new_password: str, db: Session = Depends(get_db)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("type") != "password_reset":
-            logger.warning(f"Invalid token type for password reset")
-            raise HTTPException(status_code=400, detail="Invalid token type")
-
-        username = payload.get("sub")
-        user = get_user_by_username(db, username)
-        if not user:
-            logger.error(f"Password reset failed: User {username} not found")
-            raise HTTPException(status_code=404, detail="User not found")
-
-        user.hashed_password = hash_password(new_password)
-        db.commit()
-        logger.info(f"Password reset for user {username}")
-
-        return {"message": "Password reset successfully"}
-    except JWTError as e:
-        logger.error(f"Token verification failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Registration failed")
 
 
+# Route: Login
 @router.post("/login", response_model=Token)
-def login(username: str, password: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == username).first()
-    if not user or not verify_password(password, user.hashed_password):
+def login(request: LoginRequest, db: Session = Depends(get_db)):
+    """
+    Handles user login by verifying credentials and creating a session.
+    """
+    logger.info(f"Login attempt for email: {request.email}, is_mobile: {request.is_mobile}")  # Adjust logging for clarity
+
+    # Fetch user by email
+    user = get_user_by_email(db, request.email)
+
+    if not user:
+        logger.warning(f"User with email {request.email} not found")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = create_session(user.id, db)
+    # Log and verify password
+    logger.debug(f"Stored hashed password for user {user.email}: {user.hashed_password}")
+
+    if not verify_password(request.password, user.hashed_password):
+        logger.warning(f"Password verification failed for email {user.email}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not user.is_active:
+        logger.warning(f"Inactive user {user.email} attempted login")
+        raise HTTPException(status_code=403, detail="User account is inactive")
+
+    # Create a session
+    token = create_session(user.id, db, request.is_mobile)
+    logger.info(f"Session created for email: {user.email}")
     return {"access_token": token, "token_type": "bearer"}
+
+
+
+# Route: Verify email using token
+@router.get("/verify-email", include_in_schema=False)
+async def verify_email(token: str, db: Session = Depends(get_db)):
+    logger.info("Processing email verification")
+    try:
+        # Decode the token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        logger.debug(f"Decoded token payload: {payload}")
+
+        # Validate the token type
+        if payload.get("type") != "email_verification":
+            logger.warning("Invalid token type for email verification")
+            raise HTTPException(status_code=400, detail="Invalid token type")
+
+        user_id = UUID(payload.get("sub"))  # Decode user_id as UUID
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            logger.error(f"User {user_id} not found for email verification")
+            raise HTTPException(status_code=404, detail="User not found")
+
+        if user.is_verified:
+            logger.info(f"User {user_id} already verified")
+            return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?status=already_verified")
+
+        # Update user to mark as verified and move to the next setup step
+        user.is_verified = True
+        user.setup_step = SetupStep.profile_completion
+        db.commit()
+
+        logger.info(f"Email verified for user {user_id}")
+
+        # Create a session after successful email verification
+        session_token = create_session(user.id, db)
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?status=success")
+
+    except jwt.ExpiredSignatureError:
+        logger.exception("Token verification failed: Token expired")
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?status=expired")
+    except jwt.JWTError:
+        logger.exception("Token verification failed: JWT error")
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?status=invalid")
+    except Exception as e:
+        logger.exception("Unexpected error during email verification")
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?status=error")
+
+email_cooldown_cache = {}  # {user_id: datetime}
+
+@router.post("/resend-verification")
+async def resend_verification_email(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    user_id = current_user.id
+    now = datetime.utcnow()
+
+    # Check cooldown
+    if user_id in email_cooldown_cache:
+        last_sent_time = email_cooldown_cache[user_id]
+        cooldown_remaining = (last_sent_time + timedelta(seconds=30)) - now
+        if cooldown_remaining > timedelta(0):
+            logger.warning(f"User {user_id} attempted to resend email within cooldown period")
+            raise HTTPException(
+                status_code=429,
+                detail=f"Please wait {int(cooldown_remaining.total_seconds())} seconds before resending the email."
+            )
+
+    # Refresh the verification token
+    token_data = {"sub": str(user_id), "type": "email_verification"}
+    verification_token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
+    verification_link = f"{BASE_URL}/api/auth/verify-email?token={verification_token}"
+
+    email_body = f"Click the link to verify your email: <a href='{verification_link}'>{verification_link}</a>"
+
+    try:
+        await send_email("Verify Your Email", current_user.email, email_body)
+        logger.info(f"Verification email resent to user {user_id}")
+        email_cooldown_cache[user_id] = now
+        return {"message": "Verification email resent successfully"}
+    except Exception as e:
+        logger.exception(f"Failed to resend email verification to user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to resend verification email")
+
+# Route: Logout (invalidate a session)
+@router.post("/logout")
+def logout(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    logger.info(f"Logout attempt by user ID: {current_user.id}")
+    invalidate_specific_session(current_user.id, db)
+    logger.info(f"Session invalidated for user ID: {current_user.id}")
+    return {"message": "Logged out successfully"}
+
+
+# Route: Logout all sessions
+@router.post("/logout-all")
+def logout_all(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    logger.info(f"Logout all sessions request for user ID: {current_user.id}")
+    invalidate_session(current_user.id, db)
+    logger.info(f"All sessions invalidated for user ID: {current_user.id}")
+    return {"message": "All sessions logged out successfully"}

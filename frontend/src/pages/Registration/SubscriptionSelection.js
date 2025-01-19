@@ -1,163 +1,156 @@
-import React from "react";
-import styled, { keyframes } from "styled-components";
+import React, { useEffect, useContext, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../../contexts/AuthContext";
+import styled from "styled-components";
+import { toast } from "react-toastify";
 
-const fadeIn = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-`;
-
+// Styled Components
 const Container = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
-  background: linear-gradient(135deg, #121212, #1f1f1f);
-  color: #fff;
-  animation: ${fadeIn} 1s ease-out;
+  padding: 2rem;
+  background-color: ${({ theme }) => theme.colors.secondary};
+  color: ${({ theme }) => theme.colors.textPrimary};
 `;
 
 const Title = styled.h1`
   font-size: 2.5rem;
-  margin-bottom: 20px;
+  margin-bottom: 2rem;
 `;
 
-const Subtitle = styled.p`
-  font-size: 1.2rem;
-  margin-bottom: 40px;
-  color: #bdbdbd;
-`;
-
-const PlansContainer = styled.div`
-  display: flex;
-  justify-content: space-around;
-  width: 80%;
-  gap: 20px;
-`;
-
-const PlanCard = styled.div`
-  background: ${(props) => (props.highlighted ? "#ff5722" : "#1e1e1e")};
-  border-radius: 10px;
-  padding: 20px;
-  width: 300px;
+const SubscriptionCard = styled.div`
+  background: ${({ theme }) => theme.colors.cardBackground};
+  padding: 2rem;
+  margin: 1rem;
+  border-radius: ${({ theme }) => theme.borderRadius};
+  box-shadow: ${({ theme }) => theme.shadows.medium};
+  width: 100%;
+  max-width: 400px;
   text-align: center;
-  color: ${(props) => (props.highlighted ? "#fff" : "#bdbdbd")};
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
 
-  &:hover {
-    transform: scale(1.05);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  h3 {
+    font-size: 1.8rem;
+    color: ${({ theme }) => theme.colors.primary};
   }
-`;
 
-const PlanTitle = styled.h2`
-  font-size: 1.8rem;
-  margin-bottom: 15px;
-  color: ${(props) => (props.highlighted ? "#fff" : "#e0e0e0")};
-`;
-
-const PlanPrice = styled.p`
-  font-size: 1.5rem;
-  font-weight: bold;
-  margin: 20px 0;
-`;
-
-const PlanFeatures = styled.ul`
-  list-style: none;
-  padding: 0;
-  text-align: left;
-  font-size: 1rem;
-`;
-
-const PlanFeature = styled.li`
-  margin: 10px 0;
-  &::before {
-    content: "✔";
-    color: ${(props) => (props.highlighted ? "#fff" : "#ff5722")};
-    margin-right: 10px;
+  p {
+    margin-top: 1rem;
+    font-size: 1.2rem;
   }
-`;
 
-const Button = styled.button`
-  background: ${(props) => (props.highlighted ? "#fff" : "#ff5722")};
-  color: ${(props) => (props.highlighted ? "#ff5722" : "#fff")};
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  font-size: 1rem;
-  font-weight: bold;
-  margin-top: 20px;
-  cursor: pointer;
-  transition: background 0.3s ease, color 0.3s ease;
+  button {
+    padding: 1rem;
+    background-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.textPrimary};
+    border: none;
+    border-radius: ${({ theme }) => theme.borderRadius};
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 1rem;
 
-  &:hover {
-    background: ${(props) => (props.highlighted ? "#e0e0e0" : "#e64a19")};
+    &:hover {
+      background-color: ${({ theme }) => theme.colors.primaryHover};
+    }
+
+    &:disabled {
+      background-color: ${({ theme }) => theme.colors.disabled};
+      cursor: not-allowed;
+    }
   }
 `;
 
 const SubscriptionSelection = () => {
-  const handleSubscriptionSelection = (plan) => {
-    // Add logic to redirect to Stripe checkout or process subscription
-    console.log(`Selected Plan: ${plan}`);
+  const { currentUser, updateSubscription, loading } = useContext(AuthContext);
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (loading) return; // Wait for the AuthContext to load user data
+
+    if (!currentUser) {
+      navigate("/login"); // Redirect to login if not logged in
+      return;
+    }
+
+    // Ensure the user has completed previous steps
+    if (!currentUser.is_verified) {
+      navigate("/verify_email");
+    } else if (!currentUser.profile_completed) {
+      navigate("/profile_completion");
+    }
+  }, [currentUser, loading, navigate]);
+
+  const handleSubscription = async (tier) => {
+    if (tier === "Free") {
+      try {
+        setIsLoading(true);
+        await updateSubscription({ plan: "free" });
+        toast.success("You have selected the Free tier.");
+        navigate("/dashboard"); // Redirect to dashboard
+      } catch (error) {
+        toast.error("Failed to update subscription. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Proceed to payment gateway for paid plans (e.g., Stripe)
+      try {
+        setIsLoading(true);
+        toast.info(`Redirecting to payment for the ${tier} subscription...`);
+
+        // Simulate payment process
+        setTimeout(async () => {
+          await updateSubscription({ plan: tier.toLowerCase() });
+          toast.success(`${tier} subscription successfully activated!`);
+          navigate("/dashboard"); // Redirect to dashboard
+        }, 2000);
+      } catch (error) {
+        toast.error("Failed to activate subscription. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   return (
     <Container>
-      <Title>Select Your Plan</Title>
-      <Subtitle>Choose the plan that best suits your fitness journey</Subtitle>
-      <PlansContainer>
-        {/* Basic Plan */}
-        <PlanCard>
-          <PlanTitle>Basic</PlanTitle>
-          <PlanPrice>Free</PlanPrice>
-          <PlanFeatures>
-            <PlanFeature>Limited workouts</PlanFeature>
-            <PlanFeature>Basic recipes</PlanFeature>
-            <PlanFeature>Community access</PlanFeature>
-          </PlanFeatures>
-          <Button onClick={() => handleSubscriptionSelection("Basic")}>
-            Select Plan
-          </Button>
-        </PlanCard>
+      <Title>Select Your Subscription Plan</Title>
 
-        {/* Essential Plan */}
-        <PlanCard highlighted>
-          <PlanTitle>Essential</PlanTitle>
-          <PlanPrice>$9.99/month</PlanPrice>
-          <PlanFeatures>
-            <PlanFeature highlighted>Everything in Basic</PlanFeature>
-            <PlanFeature highlighted>Personalized meal plans</PlanFeature>
-            <PlanFeature highlighted>Advanced progress tracking</PlanFeature>
-          </PlanFeatures>
-          <Button
-            highlighted
-            onClick={() => handleSubscriptionSelection("Essential")}
-          >
-            Select Plan
-          </Button>
-        </PlanCard>
+      <SubscriptionCard>
+        <h3>Free (Basic)</h3>
+        <p>Access to basic features with ads and limited content.</p>
+        <button
+          onClick={() => handleSubscription("Free")}
+          disabled={isLoading}
+        >
+          {isLoading ? "Processing..." : "Select Free"}
+        </button>
+      </SubscriptionCard>
 
-        {/* Elite Plan */}
-        <PlanCard>
-          <PlanTitle>Elite</PlanTitle>
-          <PlanPrice>$19.99/month</PlanPrice>
-          <PlanFeatures>
-            <PlanFeature>Everything in Essential</PlanFeature>
-            <PlanFeature>Live classes</PlanFeature>
-            <PlanFeature>One-on-one coaching</PlanFeature>
-          </PlanFeatures>
-          <Button onClick={() => handleSubscriptionSelection("Elite")}>
-            Select Plan
-          </Button>
-        </PlanCard>
-      </PlansContainer>
+      <SubscriptionCard>
+        <h3>Pro ($9.99/month)</h3>
+        <p>Ad-free, access to expanded features, and more workout content.</p>
+        <button
+          onClick={() => handleSubscription("Pro")}
+          disabled={isLoading}
+        >
+          {isLoading ? "Processing..." : "Select Pro"}
+        </button>
+      </SubscriptionCard>
+
+      <SubscriptionCard>
+        <h3>Elite ($19.99/month)</h3>
+        <p>All Pro features plus personalized coaching and exclusive content.</p>
+        <button
+          onClick={() => handleSubscription("Elite")}
+          disabled={isLoading}
+        >
+          {isLoading ? "Processing..." : "Select Elite"}
+        </button>
+      </SubscriptionCard>
     </Container>
   );
 };

@@ -32,15 +32,18 @@ class Settings(BaseSettings):
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your_secret_key_here")
     ALLOWED_HOSTS: str = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1")
+    HOST: str = os.getenv("HOST", "127.0.0.1")
 
     # Database settings
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/default_db")
+    TEST_DATABASE_URL: str = os.getenv("TEST_DATABASE_URL", "postgresql://user:password@localhost:5432/default")
 
     # Stripe API keys
     STRIPE_PUBLIC_KEY: str = os.getenv("STRIPE_PUBLIC_KEY", "your_stripe_public_key")
     STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "your_stripe_secret_key")
 
     BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
     # Email settings for FastAPI-Mail
     MAIL_USERNAME: str = os.getenv("MAIL_USERNAME", "default_email@example.com")

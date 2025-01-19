@@ -1,71 +1,121 @@
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from backend.core.config import settings
 from backend.api.auth.auth_routes import router as auth_router
 from backend.api.users.user_routes import router as user_router
 from backend.api.workouts.workout_routes import router as workout_router
-import logging
-
+from backend.api.middlewares.session_middleware import SessionValidationMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
-from backend.core.database import init_db
+from backend.core.database import init_db, get_db
+from backend.core.logging_config import get_logger
 
 # Initialize logging
-logging.basicConfig(
-    level=logging.DEBUG if settings.DEBUG else logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
-    title=settings.APP_NAME,
+    title=f"{settings.APP_NAME} API",
     version=settings.APP_VERSION,
-    description="API for Fitness Foundry",
-    debug=settings.DEBUG
+    description="Welcome to the Yoked Fitness API",
+    debug=settings.DEBUG,
 )
 
-# HTTPS Middleware
+# Middleware: HTTPS
 if not settings.DEBUG:
     app.add_middleware(HTTPSRedirectMiddleware)
+    logger.info("HTTPS redirect middleware added (Production mode).")
 
-# CORS Configuration
+# Parse ALLOWED_HOSTS from settings
+allowed_origins = settings.ALLOWED_HOSTS.split(",")
+
+@app.middleware("http")
+async def log_request(request: Request, call_next):
+    logger.info(f"Processing request {request.method} {request.url}")
+    response = await call_next(request)
+    logger.info(f"Response status: {response.status_code}")
+    return response
+
+# Middleware: Inject DB Session
+@app.middleware("http")
+async def db_session_middleware(request: Request, call_next):
+    request.state.db = get_db
+    response = await call_next(request)
+    return response
+
+# Configure CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust this to restrict allowed origins in production
+    allow_origins=[origin.strip() for origin in allowed_origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.mount("/", StaticFiles(directory="../frontend/build", html=True), name="static")
+logger.info(f"CORS middleware configured with origins: {allowed_origins}")
 
-# Initialize database on startup
+# Middleware: Session Validation
+try:
+    app.add_middleware(SessionValidationMiddleware)
+    logger.info("Session validation middleware added.")
+except Exception as e:
+    logger.error(f"Failed to add session middleware: {e}")
+
+# Static files for frontend
+try:
+    app.mount("/static", StaticFiles(directory="../frontend/build", html=True), name="static")
+    logger.info("Static files mounted for frontend.")
+except Exception as e:
+    logger.error(f"Failed to mount static files: {e}")
+
+# Register Routers
+try:
+    app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+    logger.info("Auth router registered.")
+except Exception as e:
+    logger.error(f"Failed to register auth router: {e}")
+
+try:
+    app.include_router(user_router, prefix="/api/users", tags=["Users"])
+    logger.info("User router registered.")
+except Exception as e:
+    logger.error(f"Failed to register user router: {e}")
+
+try:
+    app.include_router(workout_router, prefix="/api/workouts", tags=["Workouts"])
+    logger.info("Workout router registered.")
+except Exception as e:
+    logger.error(f"Failed to register workout router: {e}")
+
+# Startup Event
 @app.on_event("startup")
 def on_startup():
-    logger.info("Starting the application...")
-    init_db()
-    logger.info("Database initialized.")
+    logger.info("Starting application initialization...")
+    try:
+        init_db()
+        logger.info("Database initialized.")
+    except Exception as e:
+        logger.critical(f"Database initialization failed: {e}")
+        raise RuntimeError("Database startup failure.")
 
-# Register routers
-app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(user_router, prefix="/api/users", tags=["Users"])
-app.include_router(workout_router, prefix="/api/workouts", tags=["Workouts"])
-
-# Health Check Endpoint
+# Health Check
 @app.get("/health", tags=["System"])
 def health_check():
-    logger.debug("Health check accessed.")
+    logger.debug("Health check endpoint accessed.")
     return {"status": "ok", "environment": settings.ENV}
 
-# Run server if this file is executed directly
+# Run server
 if __name__ == "__main__":
-    uvicorn.run(
-        "backend.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG,
-        ssl_keyfile=settings.SSL_KEYFILE if not settings.DEBUG else None,
-        ssl_certfile=settings.SSL_CERTFILE if not settings.DEBUG else None
-    )
+    logger.info("Starting Uvicorn server...")
+    try:
+        uvicorn.run(
+            "backend.main:app",
+            host=settings.HOST,
+            port=8000,
+            reload=settings.DEBUG,
+            ssl_keyfile=settings.SSL_KEYFILE if not settings.DEBUG else None,
+            ssl_certfile=settings.SSL_CERTFILE if not settings.DEBUG else None,
+        )
+    except Exception as e:
+        logger.critical(f"Failed to start Uvicorn server: {e}")

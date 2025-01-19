@@ -1,10 +1,16 @@
 import React from "react";
-import ReactDOM from "react-dom/client"; // Updated for React 18
+import ReactDOM from "react-dom/client";
 import App from "./App";
+import { AuthProvider } from "./contexts/AuthContext";
+import ErrorBoundary from "./components/shared/ErrorBoundary";
 
-const root = ReactDOM.createRoot(document.getElementById("root")); // Create root for React 18
+const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
-    <React.StrictMode>
-        <App />
-    </React.StrictMode>
+  <React.StrictMode>
+    <ErrorBoundary>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+    </ErrorBoundary>
+  </React.StrictMode>
 );

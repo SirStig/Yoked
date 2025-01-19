@@ -1,30 +1,18 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+import uuid
+
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
 from backend.core.database import Base
-from backend.core.config import settings
-from jose import jwt
-
-SECRET_KEY = settings.SECRET_KEY
-ALGORITHM = "HS256"
 
 class Session(Base):
     __tablename__ = "sessions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    token = Column(String, unique=True, index=True)
-    expires_at = Column(DateTime)
-    user = relationship("User")
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    token = Column(String, unique=True, index=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    is_mobile = Column(Boolean, default=False, nullable=False)  # Indicates if session is mobile
 
-    @staticmethod
-    def create_token(user_id: int, db, lifetime_minutes: int = 60):
-        token = jwt.encode(
-            {"sub": str(user_id), "exp": datetime.utcnow() + timedelta(minutes=lifetime_minutes)},
-            SECRET_KEY,
-            algorithm=ALGORITHM,
-        )
-        session = Session(user_id=user_id, token=token, expires_at=datetime.utcnow() + timedelta(minutes=lifetime_minutes))
-        db.add(session)
-        db.commit()
-        return token
+    user = relationship("User", back_populates="sessions")
