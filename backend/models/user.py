@@ -76,6 +76,12 @@ class User(Base):
         cascade="all, delete-orphan"
     )
 
+    payments = relationship(
+        "Payment",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
 class ProgressPhoto(Base):
     __tablename__ = "progress_photos"
 

@@ -14,7 +14,19 @@ class SessionValidationMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return await call_next(request)
 
-        # Skip validation for open routes like login or registration
+        PUBLIC_ROUTES = [
+            "/api/auth/login",
+            "/api/auth/register",
+            "/api/auth/reset-password",
+            "/api/auth/verify-email",
+            "/api/subscriptions/",
+        ]
+
+        # Check if the route is in the list of public routes
+        if any(request.url.path.startswith(route) for route in PUBLIC_ROUTES):
+            return await call_next(request)
+
+        # Proceed with session validation for other routes
         if request.url.path.startswith("/api/") and "auth" not in request.url.path:
             try:
                 # Retrieve the Authorization header
@@ -45,3 +57,4 @@ class SessionValidationMiddleware(BaseHTTPMiddleware):
                 )
 
         return await call_next(request)
+

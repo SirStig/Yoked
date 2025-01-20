@@ -28,22 +28,32 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (currentUser.setup_step !== "completed") {
-    const nextStepPath = `/${currentUser.setup_step}`;
-    if (window.location.pathname !== nextStepPath) {
-      return <Navigate to={nextStepPath} replace />;
-    }
+  const excludedPaths = ["/", "/privacy-policy", "/terms-and-conditions", "/login", "/register"];
+  const nextStepPath = `/${currentUser.setup_step}`;
+
+  // Ensure no redirection happens on excluded paths
+  if (
+    currentUser.setup_step !== "completed" &&
+    !excludedPaths.includes(window.location.pathname) &&
+    window.location.pathname !== nextStepPath
+  ) {
+    return <Navigate to={nextStepPath} replace />;
   }
+
   return children;
 };
 
-
-const GuestRoute = ({ children }) => {
+const GuestRoute = ({ children, allowLoggedInHome = false }) => {
   const { currentUser, loading } = useContext(AuthContext);
 
   if (loading) return <div>Loading...</div>;
 
-  return !currentUser ? children : <Navigate to="/dashboard" replace />;
+  if (currentUser) {
+    // Allow logged-in users to access the home page if specified
+    return allowLoggedInHome ? children : <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
 };
 
 const App = () => {
@@ -56,7 +66,7 @@ const App = () => {
           <Route
             path="/"
             element={
-              <GuestRoute>
+              <GuestRoute allowLoggedInHome>
                 <Home />
               </GuestRoute>
             }

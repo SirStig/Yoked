@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from backend.models.session import Session as SessionModel
 from backend.core.logging_config import get_logger
-from uuid import UUID  # Import UUID to ensure proper typing
+from uuid import UUID
 
 # Logger setup
 logger = get_logger(__name__)
@@ -45,12 +46,18 @@ def create_session(user_id: UUID, db: Session, is_mobile: bool = False) -> str:
         db.refresh(session)
         logger.info(f"Session created: {session.id}, expires_at: {expires_at}")
         return token
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.error(f"Failed to create session for user_id: {user_id}, error: {e}")
+        db.rollback()
         raise HTTPException(status_code=500, detail="Failed to create session")
 
 
 def validate_session(token: str, db: Session) -> SessionModel:
+    """
+    Validate a session token.
+    - token: The session token to validate.
+    - db: Database session.
+    """
     logger.debug(f"Validating session token: {token}")
     session = db.query(SessionModel).filter(SessionModel.token == token).first()
 
@@ -82,7 +89,7 @@ def invalidate_session(user_id: UUID, db: Session, is_mobile: bool = None):
         deleted_count = query.delete()
         db.commit()
         logger.info(f"Invalidated {deleted_count} session(s) for user_id: {user_id}")
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.error(f"Failed to invalidate sessions for user_id: {user_id}, error: {e}")
         raise HTTPException(status_code=500, detail="Failed to invalidate sessions")
 
@@ -95,6 +102,7 @@ def invalidate_specific_session(token: str, db: Session):
     """
     logger.info(f"Invalidating specific session token: {token}")
     try:
+        # Ensure the token is treated as a string
         session = db.query(SessionModel).filter(SessionModel.token == token).first()
         if session:
             db.delete(session)
@@ -102,9 +110,11 @@ def invalidate_specific_session(token: str, db: Session):
             logger.info(f"Session invalidated: {token}")
         else:
             logger.warning(f"Session token not found for invalidation: {token}")
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.error(f"Failed to invalidate session token: {token}, error: {e}")
+        db.rollback()
         raise HTTPException(status_code=500, detail="Failed to invalidate session")
+
 
 
 def get_active_sessions(user_id: UUID, db: Session, is_mobile: bool = None):
@@ -125,6 +135,6 @@ def get_active_sessions(user_id: UUID, db: Session, is_mobile: bool = None):
         sessions = query.all()
         logger.info(f"Retrieved {len(sessions)} active session(s) for user_id: {user_id}")
         return sessions
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.error(f"Failed to fetch active sessions for user_id: {user_id}, error: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch active sessions")

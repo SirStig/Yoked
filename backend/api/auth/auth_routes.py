@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBearer
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from jose import jwt
 from sqlalchemy.orm import Session
@@ -24,6 +25,9 @@ from backend.services.session_service import (
 from backend.models.user import User, SetupStep  # Importing User model
 from backend.core.logging_config import get_logger
 from uuid import UUID  # Ensure proper handling of UUIDs
+
+auth_scheme = HTTPBearer()
+
 
 # Logger setup
 logger = get_logger(__name__)
@@ -218,12 +222,22 @@ async def resend_verification_email(
 
 # Route: Logout (invalidate a session)
 @router.post("/logout")
-def logout(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def logout(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    token: str = Depends(auth_scheme),  # Extract token from Authorization header
+):
     logger.info(f"Logout attempt by user ID: {current_user.id}")
-    invalidate_specific_session(current_user.id, db)
-    logger.info(f"Session invalidated for user ID: {current_user.id}")
-    return {"message": "Logged out successfully"}
-
+    try:
+        invalidate_specific_session(token.credentials, db)  # Pass the token to invalidate
+        logger.info(f"Session invalidated for user ID: {current_user.id}")
+        return {"message": "Logged out successfully"}
+    except HTTPException as e:
+        logger.error(f"Failed to logout user ID {current_user.id}: {e.detail}")
+        raise e
+    except Exception as e:
+        logger.error(f"Unexpected error during logout for user ID {current_user.id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred during logout.")
 
 # Route: Logout all sessions
 @router.post("/logout-all")

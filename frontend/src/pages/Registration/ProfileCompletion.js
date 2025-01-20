@@ -17,6 +17,27 @@ const Container = styled.div`
   color: ${({ theme }) => theme.colors.textPrimary};
 `;
 
+const BackgroundImage = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: url("https://images.pexels.com/photos/669577/pexels-photo-669577.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2") no-repeat center center/cover;
+  z-index: 0;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+  }
+`;
+
 const Form = styled.form`
   display: flex;
   flex-direction: column;
@@ -140,6 +161,7 @@ const ProfileCompletion = () => {
 
   return (
     <Container>
+      <BackgroundImage />
       <h1>Complete Your Profile</h1>
       <Form onSubmit={handleProfileCompletion}>
         <FieldGroup>

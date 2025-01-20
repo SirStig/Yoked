@@ -27,15 +27,22 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password, isMobile = false) => {
     try {
       const response = await loginUser(email, password, isMobile);
-      setCurrentUser(response.user); // Update current user state
+
+      // Save token to local storage
+      localStorage.setItem("token", response.access_token);
+
+      // Fetch user information using the token
+      const user = await getProfile();
+
+      // Update the current user context with the fetched user data
+      setCurrentUser(user);
+
       toast.success("Login successful!");
 
-      // Navigate to setup step or dashboard
-      if (response.user?.setup_step && response.user.setup_step !== "completed") {
-        window.location.href = `/${response.user.setup_step}`;
-      }
+      return user; // Return the user object for navigation logic
     } catch (error) {
       toast.error(error.message || "Login failed.");
+      throw error; // Re-throw the error for caller to handle
     }
   };
 
@@ -65,10 +72,12 @@ export const AuthProvider = ({ children }) => {
     try {
       await logoutUser();
       setCurrentUser(null);
+      localStorage.removeItem("token");
       toast.success("Logged out successfully.");
     } catch (error) {
       toast.error(error.message || "Failed to log out.");
     } finally {
+      // Ensure token is cleared in all cases
       localStorage.removeItem("token");
     }
   };
@@ -82,6 +91,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider
       value={{
         currentUser,
+        setCurrentUser,
         register,
         login,
         logout,

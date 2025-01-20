@@ -145,19 +145,23 @@ const Login = () => {
 
     try {
       const user = await login(email, password);
+      console.log("User after login:", user);
       toast.success("Login successful!");
 
       // Navigate based on setup_step
       if (user?.setup_step === "completed") {
         navigate("/dashboard");
+      } else if (user?.setup_step) {
+        navigate(`/${user.setup_step}`);
       } else {
-        navigate(`/${user?.setup_step}`);
+        navigate("/default-path"); // Fallback path in case setup_step is undefined
       }
     } catch (err) {
       setError(err.message || "Invalid email or password");
       toast.error(err.message || "Login failed. Please try again.");
     }
   };
+
 
   const handleBackClick = () => {
     navigate("/"); // Navigate to the home page when back button is clicked

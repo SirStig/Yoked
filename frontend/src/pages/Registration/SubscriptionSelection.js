@@ -1,156 +1,273 @@
 import React, { useEffect, useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../../contexts/AuthContext";
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
 import { toast } from "react-toastify";
+import { createStripePayment, subscribeFreeTier } from "../../api/paymentApi";
+import { getAllSubscriptions } from "../../api/subscriptionApi";
+import { logoutUser } from "../../api/authApi";
 
 // Styled Components
+const fadeIn = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
 const Container = styled.div`
+  position: relative;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 2rem;
-  background-color: ${({ theme }) => theme.colors.secondary};
-  color: ${({ theme }) => theme.colors.textPrimary};
+  overflow: hidden;
+`;
+
+const BackgroundImage = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: url("https://images.pexels.com/photos/1552252/pexels-photo-1552252.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2")
+    no-repeat center center/cover;
+  z-index: 0;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+  }
+`;
+
+const Header = styled.div`
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  gap: 1rem;
+  z-index: 2;
+
+  button {
+    background: transparent;
+    border: none;
+    color: ${({ theme }) => theme.colors.primary};
+    font-size: 1.5rem;
+    cursor: pointer;
+
+    &:hover {
+      color: ${({ theme }) => theme.colors.primaryHover};
+    }
+  }
 `;
 
 const Title = styled.h1`
   font-size: 2.5rem;
+  color: ${({ theme }) => theme.colors.textPrimary};
   margin-bottom: 2rem;
+  z-index: 2;
+  animation: ${fadeIn} 0.6s ease-in-out;
 `;
 
-const SubscriptionCard = styled.div`
+const PlansContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  z-index: 2;
+  max-width: 100%;
+  flex-wrap: wrap;
+  margin: 0 auto;
+  padding: 0 1rem;
+`;
+
+const PlanCard = styled.div`
   background: ${({ theme }) => theme.colors.cardBackground};
   padding: 2rem;
-  margin: 1rem;
   border-radius: ${({ theme }) => theme.borderRadius};
   box-shadow: ${({ theme }) => theme.shadows.medium};
-  width: 100%;
-  max-width: 400px;
   text-align: center;
+  flex: 1 1 calc(33.33% - 2rem);
+  max-width: 300px;
+  margin: 0 auto;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.3s, box-shadow 0.3s;
+
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: ${({ theme }) => theme.shadows.large};
+  }
+
+  &.selected {
+    border: 2px solid ${({ theme }) => theme.colors.primary};
+    transform: scale(1.1);
+  }
 
   h3 {
     font-size: 1.8rem;
     color: ${({ theme }) => theme.colors.primary};
   }
 
-  p {
-    margin-top: 1rem;
-    font-size: 1.2rem;
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+    text-align: left;
+
+    li {
+      margin-bottom: 0.5rem;
+    }
   }
 
-  button {
-    padding: 1rem;
-    background-color: ${({ theme }) => theme.colors.primary};
-    color: ${({ theme }) => theme.colors.textPrimary};
-    border: none;
-    border-radius: ${({ theme }) => theme.borderRadius};
-    font-size: 1.1rem;
-    font-weight: bold;
-    cursor: pointer;
-    margin-top: 1rem;
+  p {
+    font-size: 1.2rem;
+    color: ${({ theme }) => theme.colors.textSecondary};
+  }
+`;
 
-    &:hover {
-      background-color: ${({ theme }) => theme.colors.primaryHover};
-    }
+const ContinueButton = styled.button`
+  margin-top: 2rem;
+  padding: 1rem 2rem;
+  background-color: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  border: none;
+  border-radius: ${({ theme }) => theme.borderRadius};
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 2;
+  transition: background-color 0.3s;
 
-    &:disabled {
-      background-color: ${({ theme }) => theme.colors.disabled};
-      cursor: not-allowed;
-    }
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.primaryHover};
+  }
+
+  &:disabled {
+    background-color: ${({ theme }) => theme.colors.disabled};
+    cursor: not-allowed;
   }
 `;
 
 const SubscriptionSelection = () => {
-  const { currentUser, updateSubscription, loading } = useContext(AuthContext);
+  const { currentUser } = useContext(AuthContext);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [subscriptionTiers, setSubscriptionTiers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (loading) return; // Wait for the AuthContext to load user data
-
     if (!currentUser) {
-      navigate("/login"); // Redirect to login if not logged in
+      navigate("/login");
       return;
     }
 
-    // Ensure the user has completed previous steps
-    if (!currentUser.is_verified) {
-      navigate("/verify_email");
-    } else if (!currentUser.profile_completed) {
-      navigate("/profile_completion");
+    if (currentUser.setup_step !== "subscription_selection") {
+      const redirectPath = currentUser.is_verified
+        ? currentUser.profile_completed
+          ? "/dashboard"
+          : "/profile_completion"
+        : "/verify_email";
+
+      navigate(redirectPath);
     }
-  }, [currentUser, loading, navigate]);
+  }, [currentUser, navigate]);
 
-  const handleSubscription = async (tier) => {
-    if (tier === "Free") {
+  useEffect(() => {
+    const fetchTiers = async () => {
       try {
-        setIsLoading(true);
-        await updateSubscription({ plan: "free" });
-        toast.success("You have selected the Free tier.");
-        navigate("/dashboard"); // Redirect to dashboard
+        const tiers = await getAllSubscriptions();
+        setSubscriptionTiers(tiers);
       } catch (error) {
-        toast.error("Failed to update subscription. Please try again.");
-      } finally {
-        setIsLoading(false);
+        toast.error("Failed to fetch subscription tiers.");
       }
-    } else {
-      // Proceed to payment gateway for paid plans (e.g., Stripe)
-      try {
-        setIsLoading(true);
-        toast.info(`Redirecting to payment for the ${tier} subscription...`);
+    };
+    fetchTiers();
+  }, []);
 
-        // Simulate payment process
-        setTimeout(async () => {
-          await updateSubscription({ plan: tier.toLowerCase() });
-          toast.success(`${tier} subscription successfully activated!`);
-          navigate("/dashboard"); // Redirect to dashboard
-        }, 2000);
-      } catch (error) {
-        toast.error("Failed to activate subscription. Please try again.");
-      } finally {
-        setIsLoading(false);
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      toast.success("Successfully logged out.");
+      navigate("/login");
+    } catch (error) {
+      toast.error(error.message || "Failed to log out.");
+    }
+  };
+
+  const handleSelectPlan = (plan) => {
+    setSelectedPlan(plan);
+  };
+
+  const handleContinue = async () => {
+    if (!selectedPlan) {
+      toast.error("Please select a plan.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      if (selectedPlan.price === "0") {
+        await subscribeFreeTier();
+        toast.success("You have successfully subscribed to the Free plan.");
+        navigate("/dashboard");
+      } else {
+        const payment = await createStripePayment(selectedPlan.id);
+        if (payment.url) {
+          window.location.href = payment.url; // Correctly use the `url` field
+        } else {
+          throw new Error("Payment URL not received from the server.");
+        }
       }
+    } catch (error) {
+      toast.error(error.message || "Failed to proceed with the subscription.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <Container>
-      <Title>Select Your Subscription Plan</Title>
-
-      <SubscriptionCard>
-        <h3>Free (Basic)</h3>
-        <p>Access to basic features with ads and limited content.</p>
-        <button
-          onClick={() => handleSubscription("Free")}
-          disabled={isLoading}
-        >
-          {isLoading ? "Processing..." : "Select Free"}
-        </button>
-      </SubscriptionCard>
-
-      <SubscriptionCard>
-        <h3>Pro ($9.99/month)</h3>
-        <p>Ad-free, access to expanded features, and more workout content.</p>
-        <button
-          onClick={() => handleSubscription("Pro")}
-          disabled={isLoading}
-        >
-          {isLoading ? "Processing..." : "Select Pro"}
-        </button>
-      </SubscriptionCard>
-
-      <SubscriptionCard>
-        <h3>Elite ($19.99/month)</h3>
-        <p>All Pro features plus personalized coaching and exclusive content.</p>
-        <button
-          onClick={() => handleSubscription("Elite")}
-          disabled={isLoading}
-        >
-          {isLoading ? "Processing..." : "Select Elite"}
-        </button>
-      </SubscriptionCard>
+      <BackgroundImage />
+      <Header>
+        <button onClick={() => navigate("/")}>← Home</button>
+        <button onClick={handleLogout}>Logout</button>
+      </Header>
+      <Title>Choose Your Plan</Title>
+      <PlansContainer>
+        {subscriptionTiers.map((tier) => (
+          <PlanCard
+            key={tier.id}
+            className={selectedPlan?.id === tier.id ? "selected" : ""}
+            onClick={() => handleSelectPlan(tier)}
+          >
+            <h3>{tier.name}</h3>
+            <ul>
+              {tier.features.map((feature, index) => (
+                <li key={index}>{feature}</li>
+              ))}
+            </ul>
+            <p>
+              Price: {tier.price > 0 ? `$${(tier.price / 100).toFixed(2)}/month` : "Free"}
+            </p>
+          </PlanCard>
+        ))}
+      </PlansContainer>
+      <ContinueButton onClick={handleContinue} disabled={isLoading}>
+        {isLoading ? "Processing..." : "Continue to Payment"}
+      </ContinueButton>
     </Container>
   );
 };

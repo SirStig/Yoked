@@ -154,6 +154,31 @@ def get_current_user(
     return user
 
 
+def admin_required(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Verify that the current user has admin privileges.
+    - current_user: Retrieved using `get_current_user`.
+    - db: Database session.
+    """
+    logger.info(f"Admin check for user ID: {current_user.id}, email: {current_user.email}")
+
+    # Ensure the user is active
+    if not current_user.is_active:
+        logger.error(f"Inactive user tried to access admin route. User ID: {current_user.id}")
+        raise HTTPException(status_code=403, detail="User account is inactive")
+
+    # Check if the user is an admin
+    if not current_user.is_admin:
+        logger.error(f"Non-admin user tried to access admin route. User ID: {current_user.id}")
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    logger.info(f"User ID {current_user.id} passed admin check")
+    return current_user
+
+
 def logout_user(token: str, db: Session):
     """
     Log out the user by invalidating the current session.

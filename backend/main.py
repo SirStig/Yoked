@@ -2,10 +2,15 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+
+from backend.api.payments.webhooks.stripe_webhook import stripe_webhook
 from backend.core.config import settings
 from backend.api.auth.auth_routes import router as auth_router
 from backend.api.users.user_routes import router as user_router
+from backend.api.payments.payment_routes import router as payment_router
 from backend.api.workouts.workout_routes import router as workout_router
+from backend.api.payments.webhooks.stripe_webhook import router as stripe_webhook
+from backend.api.subscriptions.subscription_routes import router as subscription_router
 from backend.api.middlewares.session_middleware import SessionValidationMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from backend.core.database import init_db, get_db
@@ -87,6 +92,24 @@ try:
     logger.info("Workout router registered.")
 except Exception as e:
     logger.error(f"Failed to register workout router: {e}")
+
+try:
+    app.include_router(payment_router, prefix="/api/payments", tags=["Payments"])
+    logger.info("Payment router registered.")
+except Exception as e:
+    logger.error(f"Failed to register Payment router: {e}")
+
+try:
+    app.include_router(subscription_router, prefix="/api/subscriptions", tags=["Subscriptions"])
+    logger.info("Payment router registered.")
+except Exception as e:
+    logger.error(f"Failed to register Payment router: {e}")
+
+try:
+    app.include_router(stripe_webhook, prefix="/stripe/webhooks", tags=["StripeWebhooks"])
+    logger.info("Stripe Webhook router registered.")
+except Exception as e:
+    logger.error(f"Failed to register Stripe Webhook router: {e}")
 
 # Startup Event
 @app.on_event("startup")
