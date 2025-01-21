@@ -13,6 +13,8 @@ class PaymentStatus(PyEnum):
     PENDING = "pending"
     SUCCESS = "success"
     FAILED = "failed"
+    PAID = "paid"
+    COMPLETE = "complete"
 
 class Payment(Base):
     __tablename__ = "payments"

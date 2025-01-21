@@ -1,13 +1,11 @@
 from datetime import datetime, timedelta
-from fastapi import HTTPException, Depends
+from fastapi import HTTPException, Depends, Header
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from pydantic import EmailStr
 from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.core.logging_config import get_logger
 from backend.models.user import User
-from backend.models.session import Session as SessionModel
 from backend.services.session_service import (
     create_session,
     validate_session,
@@ -31,6 +29,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Temporary tokens for email verification, etc
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
         return pwd_context.verify(plain_password, hashed_password)
@@ -42,8 +41,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     """
     Create a new JWT access token.
-    - data: Dictionary of claims.
-    - expires_delta: Optional expiration time override.
     """
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
@@ -55,11 +52,9 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
 def get_user_by_username(db: Session, username: str) -> User:
     """
     Retrieve a user by username.
-    - db: Database session.
-    - username: Username to look up.
     """
-    user = db.query(User).filter(User.username == username).first()
-    return user
+    return db.query(User).filter(User.username == username).first()
+
 
 def get_user_by_email(db: Session, email: str) -> User:
     """
@@ -67,11 +62,10 @@ def get_user_by_email(db: Session, email: str) -> User:
     """
     return db.query(User).filter(User.email == email).first()
 
+
 def create_user(db: Session, user: UserCreate) -> User:
     """
     Create a new user in the database.
-    - db: Database session.
-    - user: UserCreate schema instance.
     """
     hashed_password = hash_password(user.password)
     new_user = User(
@@ -91,67 +85,64 @@ def create_user(db: Session, user: UserCreate) -> User:
         accepted_privacy_policy=user.accepted_privacy_policy,
         accepted_terms_at=datetime.utcnow(),
         accepted_privacy_policy_at=datetime.utcnow(),
+        profile_version=1,  # Initialize profile version
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    logger.info(f"New user created with ID: {new_user.id}, username: {new_user.username}")
     return new_user
 
 
 def authenticate_user(username: str, password: str, db: Session) -> User:
     """
     Authenticate the user by username and password.
-    - username: Username provided by the user.
-    - password: Password provided by the user.
-    - db: Database session.
     """
     user = get_user_by_username(db, username)
     if not user or not verify_password(password, user.hashed_password):
+        logger.warning(f"Authentication failed for username: {username}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not user.is_verified:
+        logger.warning(f"User {username} attempted login without email verification")
         raise HTTPException(status_code=403, detail="Email not verified")
+    logger.info(f"User {username} authenticated successfully")
     return user
 
 
 def login_user(username: str, password: str, db: Session, is_mobile: bool = False) -> str:
     """
     Log in a user by creating a new session token.
-    - username: Username of the user.
-    - password: Password of the user.
-    - db: Database session.
-    - is_mobile: Indicates if the session is for a mobile device.
     """
     user = authenticate_user(username, password, db)
     token = create_session(user.id, db, is_mobile)
+    logger.info(f"User {username} logged in successfully")
     return token
 
 
-from fastapi import Header
-
-
 def get_current_user(
-        token: str = Header(..., alias="Authorization"), db: Session = Depends(get_db)
+    token: str = Header(..., alias="Authorization"), db: Session = Depends(get_db)
 ) -> User:
     """
     Retrieve the current user based on the session token.
-    - token: Session token from the Authorization header.
-    - db: Database session.
     """
     logger.debug(f"Authorization header token: {token}")
-    if token.startswith("Bearer "):
-        token = token.split(" ")[1]
-    else:
-        logger.error("Invalid Authorization header format")
-        raise HTTPException(status_code=401, detail="Invalid token format")
+    try:
+        if token.startswith("Bearer "):
+            token = token.split(" ")[1]
+        else:
+            raise HTTPException(status_code=401, detail="Invalid token format")
 
-    session = validate_session(token, db)
-    user = db.query(User).filter(User.id == session.user_id).first()
-    if not user:
-        logger.error(f"User not found for session user_id: {session.user_id}")
-        raise HTTPException(status_code=404, detail="User not found")
+        session = validate_session(token, db)
+        user = db.query(User).filter(User.id == session.user_id).first()
+        if not user:
+            logger.error(f"User not found for session user_id: {session.user_id}")
+            raise HTTPException(status_code=404, detail="User not found")
 
-    logger.debug(f"User retrieved: {user.__dict__}")
-    return user
+        logger.debug(f"User retrieved: {user.__dict__}")
+        return user
+    except Exception as e:
+        logger.exception(f"Error in retrieving current user: {e}")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
 def admin_required(
@@ -160,38 +151,28 @@ def admin_required(
 ) -> User:
     """
     Verify that the current user has admin privileges.
-    - current_user: Retrieved using `get_current_user`.
-    - db: Database session.
     """
-    logger.info(f"Admin check for user ID: {current_user.id}, email: {current_user.email}")
-
-    # Ensure the user is active
     if not current_user.is_active:
-        logger.error(f"Inactive user tried to access admin route. User ID: {current_user.id}")
+        logger.warning(f"Inactive user attempted admin access. User ID: {current_user.id}")
         raise HTTPException(status_code=403, detail="User account is inactive")
-
-    # Check if the user is an admin
     if not current_user.is_admin:
-        logger.error(f"Non-admin user tried to access admin route. User ID: {current_user.id}")
+        logger.warning(f"Non-admin user attempted admin access. User ID: {current_user.id}")
         raise HTTPException(status_code=403, detail="Admin privileges required")
-
-    logger.info(f"User ID {current_user.id} passed admin check")
+    logger.info(f"Admin access granted for user ID: {current_user.id}")
     return current_user
 
 
 def logout_user(token: str, db: Session):
     """
     Log out the user by invalidating the current session.
-    - token: Session token.
-    - db: Database session.
     """
+    logger.info("Logging out user")
     invalidate_specific_session(token, db)
 
 
 def logout_all_sessions(user_id: int, db: Session):
     """
     Log out the user by invalidating all their sessions.
-    - user_id: ID of the user.
-    - db: Database session.
     """
+    logger.info(f"Invalidating all sessions for user ID: {user_id}")
     invalidate_session(user_id, db)

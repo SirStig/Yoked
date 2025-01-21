@@ -1,18 +1,19 @@
 from datetime import datetime, timedelta
-
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBearer
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from jose import jwt
 from sqlalchemy.orm import Session
+from urllib.parse import urlencode
 from backend.core.database import get_db
 from backend.api.auth.auth_service import (
     create_user,
     get_user_by_username,
     hash_password,
     get_current_user,
-    verify_password, get_user_by_email,
+    verify_password,
+    get_user_by_email,
 )
 from backend.schemas.user_schema import UserCreate, Token, LoginRequest
 from backend.core.config import settings
@@ -27,7 +28,6 @@ from backend.core.logging_config import get_logger
 from uuid import UUID  # Ensure proper handling of UUIDs
 
 auth_scheme = HTTPBearer()
-
 
 # Logger setup
 logger = get_logger(__name__)
@@ -56,6 +56,7 @@ conf = ConnectionConfig(
 BASE_URL = settings.BASE_URL
 FRONTEND_BASE_URL = settings.FRONTEND_URL
 
+email_cooldown_cache = {}
 
 # Helper function to send emails
 async def send_email(subject: str, recipient: str, body: str):
@@ -88,11 +89,11 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
         new_user = create_user(db, user)
         new_user.setup_step = SetupStep.email_verification
+        new_user.profile_version = 1  # Initialize profile_version
+        db.commit()  # Commit the user creation to the database
 
         token_data = {"sub": str(new_user.id), "type": "email_verification"}
-
         verification_token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
-
         session_token = create_session(new_user.id, db)
 
         verification_link = f"{settings.BASE_URL}/api/auth/verify-email?token={verification_token}"
@@ -111,7 +112,7 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     """
     Handles user login by verifying credentials and creating a session.
     """
-    logger.info(f"Login attempt for email: {request.email}, is_mobile: {request.is_mobile}")  # Adjust logging for clarity
+    logger.info(f"Login attempt for email: {request.email}, is_mobile: {request.is_mobile}")
 
     # Fetch user by email
     user = get_user_by_email(db, request.email)
@@ -119,9 +120,6 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     if not user:
         logger.warning(f"User with email {request.email} not found")
         raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    # Log and verify password
-    logger.debug(f"Stored hashed password for user {user.email}: {user.hashed_password}")
 
     if not verify_password(request.password, user.hashed_password):
         logger.warning(f"Password verification failed for email {user.email}")
@@ -137,54 +135,46 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     return {"access_token": token, "token_type": "bearer"}
 
 
-
 # Route: Verify email using token
 @router.get("/verify-email", include_in_schema=False)
 async def verify_email(token: str, db: Session = Depends(get_db)):
     logger.info("Processing email verification")
     try:
-        # Decode the token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        logger.debug(f"Decoded token payload: {payload}")
-
-        # Validate the token type
         if payload.get("type") != "email_verification":
-            logger.warning("Invalid token type for email verification")
             raise HTTPException(status_code=400, detail="Invalid token type")
 
-        user_id = UUID(payload.get("sub"))  # Decode user_id as UUID
+        user_id = UUID(payload.get("sub"))
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            logger.error(f"User {user_id} not found for email verification")
             raise HTTPException(status_code=404, detail="User not found")
 
         if user.is_verified:
-            logger.info(f"User {user_id} already verified")
-            return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?status=already_verified")
+            query_params = urlencode({"status": "already_verified"})
+            return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{query_params}")
 
-        # Update user to mark as verified and move to the next setup step
+        # Mark the user as verified and increment the profile version
         user.is_verified = True
         user.setup_step = SetupStep.profile_completion
+        user.profile_version += 1  # Increment profile version
         db.commit()
 
-        logger.info(f"Email verified for user {user_id}")
-
-        # Create a session after successful email verification
         session_token = create_session(user.id, db)
-        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?status=success")
+        query_params = urlencode({"status": "success", "token": session_token})
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{query_params}")
 
     except jwt.ExpiredSignatureError:
-        logger.exception("Token verification failed: Token expired")
-        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?status=expired")
+        query_params = urlencode({"status": "expired"})
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{query_params}")
     except jwt.JWTError:
-        logger.exception("Token verification failed: JWT error")
-        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?status=invalid")
-    except Exception as e:
-        logger.exception("Unexpected error during email verification")
-        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?status=error")
+        query_params = urlencode({"status": "invalid"})
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{query_params}")
+    except Exception:
+        query_params = urlencode({"status": "error"})
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{query_params}")
 
-email_cooldown_cache = {}  # {user_id: datetime}
 
+# Route: Resend verification email
 @router.post("/resend-verification")
 async def resend_verification_email(
     db: Session = Depends(get_db),
@@ -193,56 +183,38 @@ async def resend_verification_email(
     user_id = current_user.id
     now = datetime.utcnow()
 
-    # Check cooldown
     if user_id in email_cooldown_cache:
         last_sent_time = email_cooldown_cache[user_id]
         cooldown_remaining = (last_sent_time + timedelta(seconds=30)) - now
         if cooldown_remaining > timedelta(0):
-            logger.warning(f"User {user_id} attempted to resend email within cooldown period")
             raise HTTPException(
                 status_code=429,
                 detail=f"Please wait {int(cooldown_remaining.total_seconds())} seconds before resending the email."
             )
 
-    # Refresh the verification token
     token_data = {"sub": str(user_id), "type": "email_verification"}
     verification_token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
     verification_link = f"{BASE_URL}/api/auth/verify-email?token={verification_token}"
 
     email_body = f"Click the link to verify your email: <a href='{verification_link}'>{verification_link}</a>"
+    await send_email("Verify Your Email", current_user.email, email_body)
+    email_cooldown_cache[user_id] = now
+    return {"message": "Verification email resent successfully"}
 
-    try:
-        await send_email("Verify Your Email", current_user.email, email_body)
-        logger.info(f"Verification email resent to user {user_id}")
-        email_cooldown_cache[user_id] = now
-        return {"message": "Verification email resent successfully"}
-    except Exception as e:
-        logger.exception(f"Failed to resend email verification to user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to resend verification email")
 
-# Route: Logout (invalidate a session)
+# Route: Logout
 @router.post("/logout")
 def logout(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-    token: str = Depends(auth_scheme),  # Extract token from Authorization header
+    token: str = Depends(auth_scheme),
 ):
-    logger.info(f"Logout attempt by user ID: {current_user.id}")
-    try:
-        invalidate_specific_session(token.credentials, db)  # Pass the token to invalidate
-        logger.info(f"Session invalidated for user ID: {current_user.id}")
-        return {"message": "Logged out successfully"}
-    except HTTPException as e:
-        logger.error(f"Failed to logout user ID {current_user.id}: {e.detail}")
-        raise e
-    except Exception as e:
-        logger.error(f"Unexpected error during logout for user ID {current_user.id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred during logout.")
+    invalidate_specific_session(token.credentials, db)
+    return {"message": "Logged out successfully"}
+
 
 # Route: Logout all sessions
 @router.post("/logout-all")
 def logout_all(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    logger.info(f"Logout all sessions request for user ID: {current_user.id}")
     invalidate_session(current_user.id, db)
-    logger.info(f"All sessions invalidated for user ID: {current_user.id}")
     return {"message": "All sessions logged out successfully"}

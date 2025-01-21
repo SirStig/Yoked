@@ -53,5 +53,8 @@ class SubscriptionTier(Base):
     max_saved_workouts = Column(Integer, default=0)
     max_messages_per_day = Column(Integer, default=0)
 
+    # Versioning
+    version = Column(Integer, nullable=False, default=1)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

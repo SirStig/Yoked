@@ -24,32 +24,44 @@ def generate_token() -> str:
 
 def create_session(user_id: UUID, db: Session, is_mobile: bool = False) -> str:
     """
-    Create a new session for the user.
-    - user_id: UUID of the user.
-    - db: Database session.
-    - is_mobile: Indicates if the session is for mobile.
+    Create a new session for the user or return an existing active session.
     """
-    logger.info(f"Creating session for user_id: {user_id}, is_mobile: {is_mobile}")
-    token = generate_token()
-    expires_at = datetime.utcnow() + (MOBILE_SESSION_DURATION if is_mobile else WEB_SESSION_DURATION)
-    logger.debug(f"Session will expire at: {expires_at}")
+    logger.info(f"Creating or fetching session for user_id: {user_id}, is_mobile: {is_mobile}")
 
     try:
-        session = SessionModel(
+        # Look for an existing session that has not expired
+        existing_session = db.query(SessionModel).filter(
+            SessionModel.user_id == user_id,
+            SessionModel.is_mobile == is_mobile,
+            SessionModel.expires_at > datetime.utcnow()
+        ).first()
+
+        if existing_session:
+            logger.info(f"Active session found for user_id: {user_id}, session_id: {existing_session.id}")
+            return existing_session.token
+
+        # No active session found; create a new one
+        token = generate_token()
+        expires_at = datetime.utcnow() + (MOBILE_SESSION_DURATION if is_mobile else WEB_SESSION_DURATION)
+        logger.debug(f"Creating new session with expiry: {expires_at}")
+
+        new_session = SessionModel(
             user_id=user_id,
             token=token,
             expires_at=expires_at,
             is_mobile=is_mobile,
         )
-        db.add(session)
+        db.add(new_session)
         db.commit()
-        db.refresh(session)
-        logger.info(f"Session created: {session.id}, expires_at: {expires_at}")
+        db.refresh(new_session)
+        logger.info(f"New session created for user_id: {user_id}, session_id: {new_session.id}")
         return token
+
     except SQLAlchemyError as e:
-        logger.error(f"Failed to create session for user_id: {user_id}, error: {e}")
+        logger.error(f"Failed to create or fetch session for user_id: {user_id}. Error: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to create session")
+
 
 
 def validate_session(token: str, db: Session) -> SessionModel:

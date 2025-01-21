@@ -151,17 +151,20 @@ const Login = () => {
       // Navigate based on setup_step
       if (user?.setup_step === "completed") {
         navigate("/dashboard");
-      } else if (user?.setup_step) {
-        navigate(`/${user.setup_step}`);
+      } else if (user?.setup_step === "profile_completion") {
+        navigate("/profile-setup");
+      } else if (user?.setup_step === "subscription_selection") {
+        navigate("/choose-subscription");
+      } else if (user?.setup_step === "verify_email") {
+        navigate("/verify_email");
       } else {
-        navigate("/default-path"); // Fallback path in case setup_step is undefined
+        navigate("/dashboard"); // Fallback path in case setup_step is undefined
       }
     } catch (err) {
       setError(err.message || "Invalid email or password");
       toast.error(err.message || "Login failed. Please try again.");
     }
   };
-
 
   const handleBackClick = () => {
     navigate("/"); // Navigate to the home page when back button is clicked

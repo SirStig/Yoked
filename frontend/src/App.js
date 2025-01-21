@@ -1,5 +1,5 @@
-import React, { useContext } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import React, { useContext, useEffect } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "styled-components";
 import GlobalStyles from "./styles/globalStyles";
 import { theme } from "./styles/theme";
@@ -11,32 +11,44 @@ import Verification from "./pages/Verification";
 import ProfileCompletion from "./pages/Registration/ProfileCompletion";
 import SubscriptionSelection from "./pages/Registration/SubscriptionSelection";
 import Dashboard from "./pages/Dashboard";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCancel from "./pages/PaymentCancel";
 
-// Route Wrappers
 const ProtectedRoute = ({ children }) => {
-  const { currentUser, loading } = useContext(AuthContext);
+  const { currentUser, loading, loadUser } = useContext(AuthContext);
+  const location = useLocation();
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!loading && !currentUser) {
+        await loadUser(); // Ensure user data is loaded
+      }
+    };
+    fetchUserData();
+  }, [loading, currentUser, loadUser]);
 
   if (loading) {
-    return (
-      <div style={{ textAlign: "center", marginTop: "20%" }}>
-        <h2>Loading...</h2>
-      </div>
-    );
+    return <div>Loading...</div>;
   }
 
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
 
-  const excludedPaths = ["/", "/privacy-policy", "/terms-and-conditions", "/login", "/register"];
-  const nextStepPath = `/${currentUser.setup_step}`;
+  const currentPath = location.pathname;
 
-  // Ensure no redirection happens on excluded paths
-  if (
-    currentUser.setup_step !== "completed" &&
-    !excludedPaths.includes(window.location.pathname) &&
-    window.location.pathname !== nextStepPath
-  ) {
+  // Mapping setup_step to the corresponding paths
+  const setupStepToPath = {
+    "verify_email": "/verify_email",
+    "profile_completion": "/profile-setup",
+    "subscription_selection": "/choose-subscription",
+    "completed": "/dashboard"
+  };
+
+  const nextStepPath = setupStepToPath[currentUser.setup_step] || "/dashboard";
+
+  // Redirect to the appropriate setup page based on setup_step
+  if (currentUser.setup_step !== "completed" && currentPath !== nextStepPath) {
     return <Navigate to={nextStepPath} replace />;
   }
 
@@ -49,7 +61,6 @@ const GuestRoute = ({ children, allowLoggedInHome = false }) => {
   if (loading) return <div>Loading...</div>;
 
   if (currentUser) {
-    // Allow logged-in users to access the home page if specified
     return allowLoggedInHome ? children : <Navigate to="/dashboard" replace />;
   }
 
@@ -60,71 +71,87 @@ const App = () => {
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyles />
-      <Router>
-        <Routes>
-          {/* Guest Routes */}
-          <Route
-            path="/"
-            element={
-              <GuestRoute allowLoggedInHome>
-                <Home />
-              </GuestRoute>
-            }
-          />
-          <Route
-            path="/login"
-            element={
-              <GuestRoute>
-                <Login />
-              </GuestRoute>
-            }
-          />
-          <Route
-            path="/register"
-            element={
-              <GuestRoute>
-                <AccountCreation />
-              </GuestRoute>
-            }
-          />
+      <Routes>
+        {/* Guest Routes */}
+        <Route
+          path="/"
+          element={
+            <GuestRoute allowLoggedInHome>
+              <Home />
+            </GuestRoute>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <GuestRoute>
+              <Login />
+            </GuestRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <GuestRoute>
+              <AccountCreation />
+            </GuestRoute>
+          }
+        />
+        <Route
+          path="/payment-cancel"
+          element={
+            <GuestRoute>
+              <PaymentCancel />
+            </GuestRoute>
+          }
+        />
 
-          {/* Setup Steps */}
-          <Route
-            path="/verify_email"
-            element={
-              <ProtectedRoute>
-                <Verification />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile_completion"
-            element={
-              <ProtectedRoute>
-                <ProfileCompletion />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/subscription_selection"
-            element={
-              <ProtectedRoute>
-                <SubscriptionSelection />
-              </ProtectedRoute>
-            }
-          />
+        {/* Setup Steps */}
+        <Route
+          path="/verify_email"
+          element={
+            <ProtectedRoute>
+              <Verification />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile-setup"
+          element={
+            <ProtectedRoute>
+              <ProfileCompletion />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/choose-subscription"
+          element={
+            <ProtectedRoute>
+              <SubscriptionSelection />
+            </ProtectedRoute>
+          }
+        />
 
-          {/* Main Application */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </Router>
+        {/* Payment Success Route */}
+        <Route
+          path="/payment-success"
+          element={
+            <ProtectedRoute>
+              <PaymentSuccess />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Main Application */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
     </ThemeProvider>
   );
 };

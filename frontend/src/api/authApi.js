@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toast } from "react-toastify";
 
 // Axios instance for centralized configuration
 const apiClient = axios.create({
@@ -21,22 +22,30 @@ apiClient.interceptors.request.use((config) => {
 const handleError = (error) => {
   console.error("API Error:", error);
   if (error.response) {
-    throw error.response.data;
+    console.error("Error Details:", error.response.data);
+    toast.error(error.response.data?.detail || "An unexpected error occurred.");
+    throw new Error(error.response.data?.detail || "An unexpected error occurred.");
   } else {
-    throw new Error("Server error");
+    toast.error("Network error. Please try again later.");
+    throw new Error("Network error. Please try again later.");
   }
 };
 
+// Caching layer for profile version
+let cachedProfileVersion = localStorage.getItem("profileVersion")
+  ? parseInt(localStorage.getItem("profileVersion"), 10)
+  : null;
+
 // API: Register User
 export const registerUser = async (userData) => {
-  console.log("Calling registerUser with data:", userData); // Debug log
+  console.log("Registering user...");
   try {
     const response = await apiClient.post("/register", {
       ...userData,
       accepted_terms: true,
       accepted_privacy_policy: true,
     });
-    console.log("Register API Response:", response.data); // Debug log
+    console.log("Register API Response:", response.data);
     return response.data;
   } catch (error) {
     handleError(error);
@@ -45,10 +54,20 @@ export const registerUser = async (userData) => {
 
 // API: Login User
 export const loginUser = async (email, password, isMobile = false) => {
+  console.log("Logging in user...");
   try {
     const response = await apiClient.post("/login", { email, password, is_mobile: isMobile });
+
     // Store the session token
     localStorage.setItem("token", response.data.access_token);
+
+    // Fetch and cache the profile version
+    const version = await getProfileVersion();
+    cachedProfileVersion = version;
+
+    // Cache the profile version in localStorage
+    localStorage.setItem("profileVersion", version.toString());
+
     return response.data;
   } catch (error) {
     handleError(error);
@@ -57,66 +76,32 @@ export const loginUser = async (email, password, isMobile = false) => {
 
 // API: Logout User
 export const logoutUser = async () => {
+  console.log("Logging out user...");
   try {
     const response = await apiClient.post("/logout");
-    // Clear the session token
+
+    // Clear the session token and cache
     localStorage.removeItem("token");
+    localStorage.removeItem("profileVersion");
+    cachedProfileVersion = null;
+
     return response.data;
   } catch (error) {
     handleError(error);
   }
 };
 
-// API: Logout All Sessions
-export const logoutAllSessions = async () => {
+// API: Get Profile Version
+export const getProfileVersion = async () => {
   try {
-    const response = await apiClient.post("/logout-all");
-    // Clear the session token
-    localStorage.removeItem("token");
-    return response.data;
-  } catch (error) {
-    handleError(error);
-  }
-};
+    const response = await apiClient.get("/profile/version");
+    const version = response.data.version;
 
-// API: Verify Email
-export const verifyEmail = async (token) => {
-  try {
-    const response = await apiClient.get(`/verify-email?token=${token}`);
-    return response.data;
-  } catch (error) {
-    handleError(error);
-  }
-};
+    // Cache the version in localStorage
+    cachedProfileVersion = version;
+    localStorage.setItem("profileVersion", version.toString());
 
-// API: Password Reset Request
-export const requestPasswordReset = async (email) => {
-  try {
-    const response = await apiClient.post("/password-reset", { email });
-    return response.data;
-  } catch (error) {
-    handleError(error);
-  }
-};
-
-// API: Reset Password
-export const resetPassword = async (token, newPassword) => {
-  try {
-    const response = await apiClient.post("/reset-password", {
-      token,
-      new_password: newPassword,
-    });
-    return response.data;
-  } catch (error) {
-    handleError(error);
-  }
-};
-
-// API: Update User Subscription
-export const updateUserSubscription = async (subscriptionTier) => {
-  try {
-    const response = await apiClient.post("/update-subscription", { subscriptionTier });
-    return response.data; // Assume the response will return updated user data
+    return version;
   } catch (error) {
     handleError(error);
   }

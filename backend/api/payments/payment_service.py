@@ -19,6 +19,7 @@ logger = get_logger(__name__)
 # Initialize Stripe API
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
+
 def create_stripe_payment(user: User, subscription_tier_id: str, db: Session) -> dict:
     """
     Creates a Stripe Checkout session for a user based on subscription tier ID.
@@ -50,23 +51,46 @@ def create_stripe_payment(user: User, subscription_tier_id: str, db: Session) ->
             logger.error(f"Invalid recurring interval: {tier.recurring_interval} for tier {tier.name}")
             raise ValueError(f"Invalid interval for subscription tier: {tier.name}")
 
+        # Construct product description with tier features
+        feature_list = "\n".join(
+            [f"- {feature}" for feature in tier.features]) if tier.features else "No features listed"
+        product_description = (
+            f"{tier.name} subscription includes:\n"
+            f"{feature_list}\n\n"
+            f"Billing cycle: {tier.billing_cycle}\n"
+            f"Cancellation policy: {tier.cancellation_policy}"
+        )
+
         # Create Stripe Checkout Session
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
-            line_items=[
-                {
-                    "price_data": {
-                        "currency": tier.currency.lower(),
-                        "product_data": {"name": tier.name},
-                        "unit_amount": tier.price,
-                        "recurring": {"interval": stripe_interval},
+            line_items=[{
+                "price_data": {
+                    "currency": tier.currency.lower(),
+                    "product_data": {
+                        "name": tier.name,
+                        "description": product_description,
+                        "metadata": {
+                            "tier_id": str(tier.id),
+                            "billing_cycle": tier.billing_cycle,
+                            "cancellation_policy": tier.cancellation_policy,
+                            "max_reel_uploads": tier.max_reel_uploads,
+                            "max_saved_workouts": tier.max_saved_workouts,
+                            "max_messages_per_day": tier.max_messages_per_day,
+                        },
                     },
-                    "quantity": 1,
-                }
-            ],
+                    "unit_amount": tier.price,
+                    "recurring": {"interval": stripe_interval},
+                },
+                "quantity": 1,
+            }],
             mode="subscription",
             success_url=f"{settings.FRONTEND_URL}/success?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{settings.FRONTEND_URL}/cancel",
+            cancel_url=f"{settings.FRONTEND_URL}/cancel?session_id={{CHECKOUT_SESSION_ID}}",
+            metadata={
+                "user_id": str(user.id),
+                "user_email": user.email,
+            },
         )
 
         logger.info(f"Stripe session created: {session.id}")
@@ -78,6 +102,7 @@ def create_stripe_payment(user: User, subscription_tier_id: str, db: Session) ->
         logger.error(f"Error creating Stripe session: {str(e)}")
         raise HTTPException(status_code=500, detail="An error occurred while creating the payment session.")
 
+
 def subscribe_to_free_tier(user: User, db: Session) -> None:
     """
     Subscribes a user to the Free tier and updates their setup step to completed.
@@ -86,7 +111,11 @@ def subscribe_to_free_tier(user: User, db: Session) -> None:
     try:
         user.subscription_plan = "Free"
         user.setup_step = "completed"
+
+        # Increment profile version
+        user.profile_version += 1
         db.commit()
+
         logger.info(f"User {user.id} successfully subscribed to Free tier")
     except SQLAlchemyError as e:
         logger.error(f"Database error subscribing user {user.id} to Free tier: {str(e)}")
@@ -114,6 +143,12 @@ def create_payment(db: Session, payment_data: PaymentCreate, user_id: UUID) -> P
         db.add(new_payment)
         db.commit()
         db.refresh(new_payment)
+
+        # Increment profile version
+        user = db.query(User).filter(User.id == user_id).first()
+        user.profile_version += 1
+        db.commit()
+
         logger.info(f"Payment created successfully with ID: {new_payment.id}")
         return new_payment
     except Exception as e:
@@ -122,15 +157,14 @@ def create_payment(db: Session, payment_data: PaymentCreate, user_id: UUID) -> P
         raise HTTPException(status_code=500, detail="Failed to create payment record")
 
 
-
-
 def verify_payment(
-    db: Session,
-    payment_verify: PaymentVerify,
-    user_id: uuid.UUID
+        db: Session,
+        payment_verify: PaymentVerify,
+        user_id: uuid.UUID
 ) -> Payment:
     """
-    Verify the status of a payment based on its platform-specific ID.
+    Verify the status of a payment based on its platform-specific ID
+    and update the user's setup_step if successful.
     """
     logger.info(f"Verifying payment for user ID: {user_id} with data: {payment_verify}")
     payment = db.query(Payment).filter(
@@ -142,7 +176,7 @@ def verify_payment(
         logger.error(f"Payment record not found for ID: {payment_verify.payment_id}")
         raise HTTPException(status_code=404, detail="Payment record not found")
 
-    # Example: Verification process using Stripe
+    # Verify payment status
     if payment.platform == PaymentPlatform.STRIPE:
         try:
             stripe_payment = stripe.PaymentIntent.retrieve(payment_verify.payment_id)
@@ -155,6 +189,21 @@ def verify_payment(
 
     db.commit()
     db.refresh(payment)
+
+    if payment.status == PaymentStatus.SUCCESS:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            logger.error(f"User not found for ID: {user_id}")
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user.setup_step = "completed"
+
+        # Increment profile version
+        user.profile_version += 1
+        db.commit()
+        db.refresh(user)
+        logger.info(f"User {user_id}'s setup_step updated to 'completed'")
+
     return payment
 
 
@@ -186,7 +235,7 @@ def refund_payment(payment_id: str, db: Session) -> Payment:
 
 
 def get_user_payments(
-    user_id: uuid.UUID, page: int, page_size: int, db: Session
+        user_id: uuid.UUID, page: int, page_size: int, db: Session
 ) -> PaymentHistory:
     """
     Fetch paginated payment history for a user.

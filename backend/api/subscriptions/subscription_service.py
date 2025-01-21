@@ -3,7 +3,6 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
-
 from backend.models.subscription_tier import SubscriptionTier
 from backend.models.user import User
 from backend.core.logging_config import get_logger
@@ -28,8 +27,6 @@ def get_all_subscription_tiers(db: Session, include_inactive: bool = False) -> L
         logger.error(f"Error retrieving subscription tiers: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve subscription tiers.")
 
-
-
 def get_subscription_tier_by_id(db: Session, tier_id: str) -> Optional[SubscriptionTier]:
     """
     Retrieve a subscription tier by its ID.
@@ -46,7 +43,6 @@ def get_subscription_tier_by_id(db: Session, tier_id: str) -> Optional[Subscript
         logger.error(f"Error retrieving subscription tier {tier_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve subscription tier.")
 
-
 def create_subscription_tier(db: Session, tier_data: dict) -> SubscriptionTier:
     """
     Create a new subscription tier.
@@ -59,13 +55,17 @@ def create_subscription_tier(db: Session, tier_data: dict) -> SubscriptionTier:
         db.add(new_tier)
         db.commit()
         db.refresh(new_tier)
+
+        # Increment version after creation
+        new_tier.version = 1
+        db.commit()
+
         logger.info(f"Subscription tier created: {new_tier.name}")
         return new_tier
     except SQLAlchemyError as e:
         logger.error(f"Error creating subscription tier: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to create subscription tier.")
-
 
 def update_subscription_tier(db: Session, tier_id: str, updated_data: dict) -> SubscriptionTier:
     """
@@ -80,6 +80,11 @@ def update_subscription_tier(db: Session, tier_id: str, updated_data: dict) -> S
         for key, value in updated_data.items():
             setattr(tier, key, value)
         tier.updated_at = datetime.utcnow()
+
+        # Increment the version
+        tier.version += 1
+        logger.debug(f"Incremented version for subscription tier {tier_id} to {tier.version}")
+
         db.commit()
         db.refresh(tier)
         logger.info(f"Subscription tier updated: {tier.name}")
@@ -88,7 +93,6 @@ def update_subscription_tier(db: Session, tier_id: str, updated_data: dict) -> S
         logger.error(f"Error updating subscription tier {tier_id}: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to update subscription tier.")
-
 
 def deactivate_subscription_tier(db: Session, tier_id: str) -> None:
     """
@@ -100,13 +104,17 @@ def deactivate_subscription_tier(db: Session, tier_id: str) -> None:
         tier = get_subscription_tier_by_id(db, tier_id)
         tier.is_active = False
         tier.updated_at = datetime.utcnow()
+
+        # Increment the version
+        tier.version += 1
+        logger.debug(f"Incremented version for subscription tier {tier_id} to {tier.version}")
+
         db.commit()
         logger.info(f"Subscription tier deactivated: {tier.name}")
     except SQLAlchemyError as e:
         logger.error(f"Error deactivating subscription tier {tier_id}: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to deactivate subscription tier.")
-
 
 def delete_subscription_tier(db: Session, tier_id: str) -> None:
     """
@@ -124,6 +132,10 @@ def delete_subscription_tier(db: Session, tier_id: str) -> None:
             )
         db.delete(tier)
         db.commit()
+
+        # Increment the version upon deletion
+        db.commit()
+
         logger.info(f"Subscription tier deleted: {tier.name}")
     except SQLAlchemyError as e:
         logger.error(f"Error deleting subscription tier {tier_id}: {str(e)}")

@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from sqlalchemy.orm import Session
 from backend.core.database import get_db
@@ -5,13 +6,10 @@ from backend.api.auth.auth_service import get_current_user
 from backend.schemas.user_schema import UserProfileUpdate, UserProfile
 from backend.models.user import User
 from backend.api.users.user_service import (
-    get_user_profile,
-    update_user_profile,
     deactivate_user,
     reactivate_user,
     is_user_active,
 )
-from backend.core.aws_utils import upload_file_to_s3
 from backend.core.logging_config import get_logger
 
 # Logger setup
@@ -31,10 +29,24 @@ async def get_profile(
     logger.info(f"Fetching profile for user ID {current_user.id}")
     try:
         return UserProfile.from_orm(current_user)
-    except HTTPException as e:
-        logger.error(f"Error fetching profile for user ID {current_user.id}: {e.detail}")
-        raise e
+    except Exception as e:
+        logger.exception(f"Error fetching profile for user ID {current_user.id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch profile.")
 
+
+@router.get("/profile/version", response_model=dict)
+async def get_profile_version(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """
+    Get the profile version for the current user.
+    """
+    logger.info(f"Fetching profile version for user ID {current_user.id}")
+    try:
+        return {"profile_version": current_user.profile_version}
+    except Exception as e:
+        logger.exception(f"Error fetching profile version for user ID {current_user.id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch profile version.")
 
 
 @router.put("/profile", response_model=UserProfile)
@@ -48,22 +60,12 @@ async def update_profile(
     """
     logger.info(f"Updating profile for user ID {current_user.id}")
     try:
-        if profile_data.age is not None:
-            current_user.age = profile_data.age
-        if profile_data.gender is not None:
-            current_user.gender = profile_data.gender
-        if profile_data.fitness_goals is not None:
-            current_user.fitness_goals = profile_data.fitness_goals
-        if profile_data.height is not None:
-            current_user.height = profile_data.height
-        if profile_data.weight is not None:
-            current_user.weight = profile_data.weight
-        if profile_data.height_unit is not None:
-            current_user.height_unit = profile_data.height_unit
-        if profile_data.weight_unit is not None:
-            current_user.weight_unit = profile_data.weight_unit
-        if profile_data.setup_step is not None:
-            current_user.setup_step = profile_data.setup_step
+        # Update user fields
+        for key, value in profile_data.dict(exclude_unset=True).items():
+            setattr(current_user, key, value)
+
+        # Increment profile version
+        current_user.profile_version += 1
 
         db.commit()
         db.refresh(current_user)
@@ -71,7 +73,7 @@ async def update_profile(
         logger.info(f"Profile updated for user ID {current_user.id}")
         return UserProfile.from_orm(current_user)
     except Exception as e:
-        logger.error(f"Error updating profile for user ID {current_user.id}: {str(e)}")
+        logger.exception(f"Error updating profile for user ID {current_user.id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update profile.")
 
 
@@ -85,16 +87,21 @@ async def deactivate_account(
     logger.info(f"Deactivating account for user ID {current_user.id}")
     try:
         deactivate_user(db, current_user.id)
+
+        # Increment profile version
+        current_user.profile_version += 1
+        db.commit()
+
         logger.info(f"Account deactivated for user ID {current_user.id}")
         return {"message": "Account deactivated successfully"}
-    except HTTPException as e:
-        logger.error(f"Error deactivating account for user ID {current_user.id}: {e.detail}")
-        raise e
+    except Exception as e:
+        logger.exception(f"Error deactivating account for user ID {current_user.id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to deactivate account.")
 
 
 @router.put("/reactivate", response_model=dict)
 async def reactivate_account(
-    user_id: int, db: Session = Depends(get_db)
+    user_id: uuid.UUID, db: Session = Depends(get_db)
 ):
     """
     Reactivate a user's account (admin feature).
@@ -102,11 +109,17 @@ async def reactivate_account(
     logger.info(f"Reactivating account for user ID {user_id}")
     try:
         reactivate_user(db, user_id)
+
+        # Increment profile version
+        user = db.query(User).filter(User.id == user_id).first()
+        user.profile_version += 1
+        db.commit()
+
         logger.info(f"Account reactivated for user ID {user_id}")
         return {"message": "Account reactivated successfully"}
-    except HTTPException as e:
-        logger.error(f"Error reactivating account for user ID {user_id}: {e.detail}")
-        raise e
+    except Exception as e:
+        logger.exception(f"Error reactivating account for user ID {user_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to reactivate account.")
 
 
 @router.get("/active-status", response_model=dict)
@@ -119,8 +132,7 @@ async def check_active_status(
     logger.info(f"Checking active status for user ID {current_user.id}")
     try:
         is_active = is_user_active(db, current_user.id)
-        logger.info(f"Active status for user ID {current_user.id}: {is_active}")
         return {"is_active": is_active}
-    except HTTPException as e:
-        logger.error(f"Error checking active status for user ID {current_user.id}: {e.detail}")
-        raise e
+    except Exception as e:
+        logger.exception(f"Error checking active status for user ID {current_user.id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to check active status.")

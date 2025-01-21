@@ -3,7 +3,7 @@ import styled from "styled-components";
 import { toast } from "react-toastify";
 import { AuthContext } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { updateProfile, getProfile } from "../../api/userApi"; // Import API functions
+import { updateProfile } from "../../api/userApi";
 
 // Styled Components
 const Container = styled.div`
@@ -15,6 +15,8 @@ const Container = styled.div`
   width: 100%;
   background-color: ${({ theme }) => theme.colors.secondary};
   color: ${({ theme }) => theme.colors.textPrimary};
+  position: relative;
+  overflow: hidden;
 `;
 
 const BackgroundImage = styled.div`
@@ -23,7 +25,8 @@ const BackgroundImage = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  background: url("https://images.pexels.com/photos/669577/pexels-photo-669577.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2") no-repeat center center/cover;
+  background: url("https://images.pexels.com/photos/669577/pexels-photo-669577.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2")
+    no-repeat center center/cover;
   z-index: 0;
 
   &::after {
@@ -38,29 +41,78 @@ const BackgroundImage = styled.div`
   }
 `;
 
-const Form = styled.form`
+const Header = styled.div`
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  gap: 1rem;
+  z-index: 2;
+
+  button {
+    background: transparent;
+    border: none;
+    color: ${({ theme }) => theme.colors.primary};
+    font-size: 1.5rem;
+    cursor: pointer;
+
+    &:hover {
+      color: ${({ theme }) => theme.colors.primaryHover};
+    }
+  }
+`;
+
+const CardWrapper = styled.div`
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 70%;
+  width: 100%;
+  padding: 1rem;
+  z-index: 1;
+`;
+
+const Card = styled.div`
+  position: absolute;
+  width: 80%;
+  max-width: 500px;
+  padding: 2rem;
+  border-radius: ${({ theme }) => theme.borderRadius};
+  background-color: ${({ theme }) => theme.colors.cardBackground};
+  box-shadow: ${({ theme }) => theme.shadows.medium};
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  background-color: ${({ theme }) => theme.colors.cardBackground};
-  padding: 2rem;
-  border-radius: ${({ theme }) => theme.borderRadius};
-  box-shadow: ${({ theme }) => theme.shadows.medium};
-  width: 90%;
-  max-width: 600px;
-`;
+  gap: 1.5rem;
+  text-align: center;
+  animation: ${(props) => (props.isEntering ? "fadeIn" : "fadeOut")} 0.5s ease-in-out forwards;
 
-const FieldGroup = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  width: 100%;
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(-100%);
+    }
+  }
 `;
 
 const Input = styled.input`
-  flex: 1;
-  min-width: 150px;
+  width: 90%;
   padding: 1rem;
   border: 1px solid ${({ theme }) => theme.colors.inputBorder};
   border-radius: ${({ theme }) => theme.borderRadius};
@@ -70,8 +122,7 @@ const Input = styled.input`
 `;
 
 const Dropdown = styled.select`
-  flex: 1;
-  min-width: 150px;
+  width: 90%;
   padding: 1rem;
   border: 1px solid ${({ theme }) => theme.colors.inputBorder};
   border-radius: ${({ theme }) => theme.borderRadius};
@@ -80,134 +131,164 @@ const Dropdown = styled.select`
   font-size: 1rem;
 `;
 
+const ButtonContainer = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+`;
+
 const Button = styled.button`
-  width: 100%;
-  padding: 1rem;
+  padding: 0.8rem 1.5rem;
   background-color: ${({ theme }) => theme.colors.primary};
   color: ${({ theme }) => theme.colors.textPrimary};
   border: none;
   border-radius: ${({ theme }) => theme.borderRadius};
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
+  box-shadow: ${({ theme }) => theme.shadows.light};
+  transition: all 0.3s ease-in-out;
 
   &:hover {
     background-color: ${({ theme }) => theme.colors.primaryHover};
+    transform: scale(1.05);
+    box-shadow: ${({ theme }) => theme.shadows.medium};
+  }
+
+  &:disabled {
+    background-color: ${({ theme }) => theme.colors.disabled};
+    cursor: not-allowed;
   }
 `;
 
 const ProfileCompletion = () => {
-  const { loadUser } = useContext(AuthContext);
-  const [age, setAge] = useState("");
-  const [gender, setGender] = useState("");
-  const [fitnessGoal, setFitnessGoal] = useState("");
-  const [heightUnit, setHeightUnit] = useState("ft"); // Default to "ft/in"
-  const [height, setHeight] = useState({ cm: "", ft: "", in: "" });
-  const [weightUnit, setWeightUnit] = useState("lbs"); // Default to "lbs"
-  const [weight, setWeight] = useState("");
-  const [loading, setLoading] = useState(false); // Loading state
+  const { logout, loadUser } = useContext(AuthContext);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [profileData, setProfileData] = useState({
+    age: "",
+    gender: "",
+    fitness_goals: "",
+    height_unit: "ft",
+    height: { cm: "", ft: "", in: "" },
+    weight_unit: "lbs",
+    weight: "",
+  });
   const navigate = useNavigate();
 
-  const handleProfileCompletion = async (e) => {
-    e.preventDefault();
+  const handleNext = () => {
+    setActiveIndex((prev) => Math.min(prev + 1, cards.length - 1));
+  };
 
-    if (!age || !gender || !fitnessGoal || (!height.cm && !height.ft) || !weight) {
-      toast.error("Please complete all fields.");
-      return;
+  const handleBack = () => {
+    setActiveIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
+  const handleSubmit = async () => {
+    let heightValue;
+    let weightValue;
+
+    // Convert height to the appropriate unit (e.g., in cm)
+    if (profileData.height_unit === "cm") {
+      heightValue = parseInt(profileData.height.cm, 10);
+    } else if (profileData.height_unit === "ft") {
+      const feetInches = profileData.height.ft * 12 + profileData.height.in;
+      heightValue = feetInches * 2.54; // Convert to cm
     }
 
-    const heightValue =
-      heightUnit === "cm"
-        ? `${height.cm} cm`
-        : `${height.ft} ft ${height.in} in`;
-
-    const weightValue = weightUnit === "kg" ? `${weight} kg` : `${weight} lbs`;
+    // Convert weight to the appropriate unit (e.g., kg)
+    if (profileData.weight_unit === "kg") {
+      weightValue = parseFloat(profileData.weight);
+    } else if (profileData.weight_unit === "lbs") {
+      weightValue = parseFloat(profileData.weight) * 0.453592; // Convert to kg
+    }
 
     try {
-      setLoading(true); // Start loading
-
-      // Update the profile
+      // Send numeric values to backend
       await updateProfile({
-        age: parseInt(age, 10),
-        gender,
-        fitness_goals: fitnessGoal,
+        ...profileData,
         height: heightValue,
-        height_unit: heightUnit,
         weight: weightValue,
-        weight_unit: weightUnit,
-        setup_step: "subscription_selection", // Next step
+        setup_step: "subscription-selection",
       });
-
+      await loadUser();
       toast.success("Profile updated successfully!");
-
-      // Fetch updated profile to determine next step
-      const updatedProfile = await getProfile();
-      await loadUser(); // Refresh AuthContext with the updated user data
-
-      // Navigate to the next step based on the updated profile's setup_step
-      if (updatedProfile.setup_step === "subscription_selection") {
-        navigate("/subscription_selection");
-      } else if (updatedProfile.setup_step === "completed") {
-        navigate("/dashboard");
-      } else {
-        navigate("/"); // Fallback
-      }
+      navigate("/choose-subscription");  // Redirect after completion
     } catch (error) {
-      toast.error(error.message || "Failed to complete profile.");
-    } finally {
-      setLoading(false); // Stop loading
+      toast.error(error.message || "Failed to update profile.");
     }
   };
 
-  return (
-    <Container>
-      <BackgroundImage />
-      <h1>Complete Your Profile</h1>
-      <Form onSubmit={handleProfileCompletion}>
-        <FieldGroup>
+  const cards = [
+    {
+      title: "Tell us about yourself",
+      content: (
+        <>
           <Input
             type="number"
             placeholder="Age"
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
-            required
+            value={profileData.age}
+            onChange={(e) =>
+              setProfileData((prev) => ({ ...prev, age: e.target.value }))
+            }
           />
           <Dropdown
-            value={gender}
-            onChange={(e) => setGender(e.target.value)}
-            required
+            value={profileData.gender}
+            onChange={(e) =>
+              setProfileData((prev) => ({ ...prev, gender: e.target.value }))
+            }
           >
             <option value="">Select Gender</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
             <option value="other">Other</option>
           </Dropdown>
-        </FieldGroup>
+        </>
+      ),
+    },
+    {
+      title: "What's your fitness goal?",
+      content: (
         <Dropdown
-          value={fitnessGoal}
-          onChange={(e) => setFitnessGoal(e.target.value)}
-          required
+          value={profileData.fitness_goals}
+          onChange={(e) =>
+            setProfileData((prev) => ({ ...prev, fitness_goals: e.target.value }))
+          }
         >
           <option value="">Select Fitness Goal</option>
           <option value="weight_loss">Weight Loss</option>
           <option value="muscle_gain">Muscle Gain</option>
           <option value="general_fitness">General Fitness</option>
         </Dropdown>
-        <FieldGroup>
+      ),
+    },
+    {
+      title: "What's your height?",
+      content: (
+        <>
           <Dropdown
-            value={heightUnit}
-            onChange={(e) => setHeightUnit(e.target.value)}
+            value={profileData.height_unit}
+            onChange={(e) =>
+              setProfileData((prev) => ({ ...prev, height_unit: e.target.value }))
+            }
           >
-            <option value="ft">Height (ft/in)</option>
-            <option value="cm">Height (cm)</option>
+            <option value="ft">Feet/Inches</option>
+            <option value="cm">Centimeters</option>
           </Dropdown>
-          {heightUnit === "cm" ? (
+          {profileData.height_unit === "cm" ? (
             <Input
               type="number"
               placeholder="Height (cm)"
-              value={height.cm}
+              value={profileData.height.cm}
               onChange={(e) =>
-                setHeight((prev) => ({ ...prev, cm: e.target.value, ft: "", in: "" }))
+                setProfileData((prev) => ({
+                  ...prev,
+                  height: { cm: e.target.value, ft: "", in: "" },
+                }))
               }
             />
           ) : (
@@ -215,42 +296,81 @@ const ProfileCompletion = () => {
               <Input
                 type="number"
                 placeholder="Feet"
-                value={height.ft}
+                value={profileData.height.ft}
                 onChange={(e) =>
-                  setHeight((prev) => ({ ...prev, ft: e.target.value }))
+                  setProfileData((prev) => ({
+                    ...prev,
+                    height: { ...prev.height, ft: e.target.value },
+                  }))
                 }
               />
               <Input
                 type="number"
                 placeholder="Inches"
-                value={height.in}
+                value={profileData.height.in}
                 onChange={(e) =>
-                  setHeight((prev) => ({ ...prev, in: e.target.value }))
+                  setProfileData((prev) => ({
+                    ...prev,
+                    height: { ...prev.height, in: e.target.value },
+                  }))
                 }
               />
             </>
           )}
-        </FieldGroup>
-        <FieldGroup>
+        </>
+      ),
+    },
+    {
+      title: "What's your weight?",
+      content: (
+        <>
           <Dropdown
-            value={weightUnit}
-            onChange={(e) => setWeightUnit(e.target.value)}
+            value={profileData.weight_unit}
+            onChange={(e) =>
+              setProfileData((prev) => ({ ...prev, weight_unit: e.target.value }))
+            }
           >
-            <option value="lbs">Weight (lbs)</option>
-            <option value="kg">Weight (kg)</option>
+            <option value="lbs">Pounds</option>
+            <option value="kg">Kilograms</option>
           </Dropdown>
           <Input
             type="number"
-            placeholder={`Weight (${weightUnit})`}
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            required
+            placeholder={`Weight (${profileData.weight_unit})`}
+            value={profileData.weight}
+            onChange={(e) =>
+              setProfileData((prev) => ({ ...prev, weight: e.target.value }))
+            }
           />
-        </FieldGroup>
-        <Button type="submit" disabled={loading}>
-          {loading ? "Updating..." : "Continue"}
-        </Button>
-      </Form>
+        </>
+      ),
+    },
+  ];
+
+  return (
+    <Container>
+      <BackgroundImage />
+      <Header>
+        <button onClick={() => navigate("/")}>← Home</button>
+        <button onClick={handleLogout}>Logout</button>
+      </Header>
+      <CardWrapper>
+        {cards.map((card, index) =>
+          index === activeIndex ? (
+            <Card key={index} isEntering>
+              <h2>{card.title}</h2>
+              {card.content}
+              <ButtonContainer>
+                {index > 0 && <Button onClick={handleBack}>Back</Button>}
+                <Button
+                  onClick={index === cards.length - 1 ? handleSubmit : handleNext}
+                >
+                  {index === cards.length - 1 ? "Finish" : "Continue"}
+                </Button>
+              </ButtonContainer>
+            </Card>
+          ) : null
+        )}
+      </CardWrapper>
     </Container>
   );
 };

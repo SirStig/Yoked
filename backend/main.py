@@ -1,3 +1,5 @@
+import subprocess
+import signal
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
@@ -60,6 +62,53 @@ app.add_middleware(
 
 logger.info(f"CORS middleware configured with origins: {allowed_origins}")
 
+# Celery processes
+celery_worker = None
+celery_beat = None
+
+def start_celery():
+    """
+    Start Celery worker and beat scheduler.
+    """
+    global celery_worker, celery_beat
+    try:
+        # Start Celery worker
+        celery_worker = subprocess.Popen(
+            ["celery", "-A", "backend.tasks.celery_app", "worker", "--loglevel=info"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        logger.info("Celery worker started.")
+
+        # Start Celery beat scheduler
+        celery_beat = subprocess.Popen(
+            ["celery", "-A", "backend.tasks.celery_app", "beat", "--loglevel=info"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        logger.info("Celery beat scheduler started.")
+    except Exception as e:
+        logger.error(f"Failed to start Celery: {e}")
+        raise
+
+def stop_celery():
+    """
+    Stop Celery worker and beat scheduler.
+    """
+    global celery_worker, celery_beat
+    try:
+        if celery_worker:
+            celery_worker.terminate()
+            celery_worker.wait()
+            logger.info("Celery worker stopped.")
+
+        if celery_beat:
+            celery_beat.terminate()
+            celery_beat.wait()
+            logger.info("Celery beat scheduler stopped.")
+    except Exception as e:
+        logger.error(f"Error stopping Celery: {e}")
+
 # Middleware: Session Validation
 try:
     app.add_middleware(SessionValidationMiddleware)
@@ -101,9 +150,9 @@ except Exception as e:
 
 try:
     app.include_router(subscription_router, prefix="/api/subscriptions", tags=["Subscriptions"])
-    logger.info("Payment router registered.")
+    logger.info("Subscription router registered.")
 except Exception as e:
-    logger.error(f"Failed to register Payment router: {e}")
+    logger.error(f"Failed to register Subscription router: {e}")
 
 try:
     app.include_router(stripe_webhook, prefix="/stripe/webhooks", tags=["StripeWebhooks"])
@@ -118,9 +167,16 @@ def on_startup():
     try:
         init_db()
         logger.info("Database initialized.")
+        start_celery()
     except Exception as e:
-        logger.critical(f"Database initialization failed: {e}")
-        raise RuntimeError("Database startup failure.")
+        logger.critical(f"Startup failure: {e}")
+        raise RuntimeError("Application startup failed.")
+
+# Shutdown Event
+@app.on_event("shutdown")
+def on_shutdown():
+    logger.info("Shutting down application...")
+    stop_celery()
 
 # Health Check
 @app.get("/health", tags=["System"])

@@ -1,7 +1,7 @@
 import React, { useState, useContext } from "react";
 import { toast } from "react-toastify";
 import styled, { keyframes } from "styled-components";
-import { AuthContext } from "../../contexts/AuthContext"; // Context for registration and session
+import { AuthContext } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 // Animation for loading spinner
@@ -53,30 +53,95 @@ const FormWrapper = styled.div`
   padding: 2rem;
   border-radius: ${({ theme }) => theme.borderRadius};
   box-shadow: ${({ theme }) => theme.shadows.medium};
+  position: relative;
+`;
+
+const BackButton = styled.button`
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 0.5rem;
+  background-color: transparent;
+  border: none;
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: 1.5rem;
+  cursor: pointer;
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.primaryHover};
+  }
 `;
 
 const Form = styled.form`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const Row = styled.div`
+  display: flex;
   gap: 1rem;
 
   @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
-    grid-template-columns: 1fr;
+    flex-direction: column;
   }
+`;
+
+const InputGroup = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 `;
 
 const Input = styled.input`
   width: 100%;
-  padding: 1rem;
-  border: 1px solid ${({ theme }) => theme.colors.inputBorder};
+  padding: 0.8rem;
+  border: 1px solid ${({ error, theme }) => (error ? theme.colors.errorBorder : theme.colors.inputBorder)};
   border-radius: ${({ theme }) => theme.borderRadius};
   background-color: ${({ theme }) => theme.colors.inputBackground};
   color: ${({ theme }) => theme.colors.textPrimary};
   font-size: 1rem;
 `;
 
+const ErrorText = styled.span`
+  font-size: 0.8rem;
+  color: ${({ theme }) => theme.colors.errorText};
+  margin-top: 0.2rem;
+`;
+
+const PasswordStrengthWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const PasswordStrengthText = styled.div`
+  font-size: 0.9rem;
+  color: ${({ $strength }) =>
+    $strength === "Very Strong" ? "green" :
+    $strength === "Strong" ? "#4caf50" :
+    $strength === "Medium" ? "#ff9800" :
+    $strength === "Weak" ? "#f44336" : "gray"};
+`;
+
+const PasswordStrengthBar = styled.div`
+  height: 8px;
+  background-color: ${({ theme }) => theme.colors.inputBackground};
+  border-radius: ${({ theme }) => theme.borderRadius};
+  overflow: hidden;
+
+  div {
+    height: 100%;
+    width: ${({ $percentage }) => `${$percentage}%`};
+    background-color: ${({ $percentage }) =>
+      $percentage > 80 ? "green" :
+      $percentage > 60 ? "#4caf50" :
+      $percentage > 40 ? "#ff9800" :
+      $percentage > 20 ? "#f44336" : "gray"};
+  }
+`;
+
 const CheckboxContainer = styled.div`
-  grid-column: span 2;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -88,7 +153,6 @@ const CheckboxContainer = styled.div`
 `;
 
 const Button = styled.button`
-  grid-column: span 2;
   width: 100%;
   padding: 1rem;
   background-color: ${({ theme }) => theme.colors.primary};
@@ -109,55 +173,8 @@ const Button = styled.button`
   }
 `;
 
-const BackButton = styled.button`
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  padding: 0.5rem;
-  background-color: transparent;
-  border: none;
-  color: ${({ theme }) => theme.colors.primary};
-  font-size: 1.5rem;
-  cursor: pointer;
-
-  &:hover {
-    color: ${({ theme }) => theme.colors.primaryHover};
-  }
-`;
-
-const LoadingContainer = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  grid-column: span 2;
-`;
-
-const Spinner = styled.div`
-  border: 4px solid ${({ theme }) => theme.colors.inputBackground};
-  border-top: 4px solid ${({ theme }) => theme.colors.primary};
-  border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  animation: ${spin} 1s linear infinite;
-  margin: 0 auto;
-`;
-
-const ErrorMessage = styled.div`
-  grid-column: span 2;
-  width: 100%;
-  padding: 1rem;
-  margin-top: 1rem;
-  background-color: ${({ theme }) => theme.colors.errorBackground};
-  color: ${({ theme }) => theme.colors.errorText};
-  border: 1px solid ${({ theme }) => theme.colors.errorBorder};
-  border-radius: ${({ theme }) => theme.borderRadius};
-  font-size: 0.9rem;
-  font-weight: bold;
-  text-align: center;
-`;
-
 const AccountCreation = () => {
-  const { register } = useContext(AuthContext); // Use register from AuthContext
+  const { register } = useContext(AuthContext);
   const [formData, setFormData] = useState({
     username: "",
     full_name: "",
@@ -167,16 +184,41 @@ const AccountCreation = () => {
     verify_password: "",
     accepted_terms_and_privacy: false,
   });
+  const [errors, setErrors] = useState({});
+  const [passwordStrength, setPasswordStrength] = useState("");
+  const [passwordStrengthPercentage, setPasswordStrengthPercentage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(""); // To store custom error messages
   const navigate = useNavigate();
 
+  const calculatePasswordStrength = (password) => {
+    if (!password) return { strength: "", percentage: 0 };
+
+    let score = 0;
+    if (password.length >= 8) score += 1; // Minimum length
+    if (/[A-Z]/.test(password)) score += 1; // Uppercase letter
+    if (/[a-z]/.test(password)) score += 1; // Lowercase letter
+    if (/[0-9]/.test(password)) score += 1; // Number
+    if (/[@$!%*?&#]/.test(password)) score += 1; // Special character
+
+    const percentage = (score / 5) * 100;
+    const strength =
+      score === 5 ? "Very Strong" :
+      score === 4 ? "Strong" :
+      score === 3 ? "Medium" :
+      score === 2 ? "Weak" : "Very Weak";
+
+    return { strength, percentage };
+  };
+
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === "checkbox" ? checked : value,
-    });
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "password") {
+      const { strength, percentage } = calculatePasswordStrength(value);
+      setPasswordStrength(strength);
+      setPasswordStrengthPercentage(percentage);
+    }
   };
 
   const handleBackClick = () => {
@@ -185,47 +227,28 @@ const AccountCreation = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const newErrors = {};
 
-    if (formData.email !== formData.verify_email) {
-      setErrorMessage("Emails do not match.");
-      return;
-    }
+    if (formData.email !== formData.verify_email) newErrors.email = "Emails do not match.";
+    if (formData.password !== formData.verify_password) newErrors.password = "Passwords do not match.";
+    if (!formData.accepted_terms_and_privacy) newErrors.terms = "You must accept the terms to proceed.";
 
-    if (formData.password !== formData.verify_password) {
-      setErrorMessage("Passwords do not match.");
-      return;
-    }
+    setErrors(newErrors);
 
-    if (!formData.accepted_terms_and_privacy) {
-      setErrorMessage("You must accept the Terms and Privacy Policy to register.");
-      return;
-    }
+    if (Object.keys(newErrors).length > 0) return;
 
     setIsLoading(true);
-    setErrorMessage("");
 
     try {
-      const { username, full_name, email, password } = formData;
-
-      // Call register from AuthContext
-      const userData = await register({
-        username,
-        full_name,
-        email,
-        password,
-        accepted_terms: true,
-        accepted_privacy_policy: true,
-      });
-
-      toast.success("Account created! Please verify your email.");
-
-      // Redirect to the next step based on the setup_step
-      if (userData.setup_step) {
-        navigate(`/${userData.setup_step}`);
-      }
+      const {username, full_name, email, password} = formData;
+      await register({username, full_name, email, password});
+      toast.success("Account created successfully! Please verify your email.");
+      navigate("/verify_email");  // Direct the user to verify their email
     } catch (err) {
-      const errorResponse = err.response?.data?.detail || "Registration failed. Please try again.";
-      setErrorMessage(errorResponse);
+      const error = err.response?.data?.detail || "Registration failed. Please try again.";
+      if (error.includes("email")) newErrors.email = error;
+      if (error.includes("username")) newErrors.username = error;
+      setErrors(newErrors);
     } finally {
       setIsLoading(false);
     }
@@ -241,76 +264,103 @@ const AccountCreation = () => {
         src="https://videos.pexels.com/video-files/4761426/4761426-uhd_4096_2160_25fps.mp4"
       />
       <div className="video-overlay"></div>
+      <BackButton onClick={handleBackClick}>←</BackButton>
       <FormWrapper>
-        <BackButton onClick={handleBackClick}>←</BackButton>
         <h1>Create Your Account</h1>
         <Form onSubmit={handleSubmit}>
-          <Input
-            type="text"
-            name="full_name"
-            placeholder="Full Name"
-            value={formData.full_name}
-            onChange={handleChange}
-            required
-          />
-          <Input
-            type="text"
-            name="username"
-            placeholder="Username"
-            value={formData.username}
-            onChange={handleChange}
-            required
-          />
-          <Input
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-          />
-          <Input
-            type="email"
-            name="verify_email"
-            placeholder="Verify Email"
-            value={formData.verify_email}
-            onChange={handleChange}
-            required
-          />
-          <Input
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-          />
-          <Input
-            type="password"
-            name="verify_password"
-            placeholder="Verify Password"
-            value={formData.verify_password}
-            onChange={handleChange}
-            required
-          />
+          <Row>
+            <InputGroup>
+              <Input
+                type="text"
+                name="full_name"
+                placeholder="Full Name"
+                value={formData.full_name}
+                onChange={handleChange}
+                required
+              />
+            </InputGroup>
+            <InputGroup>
+              <Input
+                type="text"
+                name="username"
+                placeholder="Username"
+                value={formData.username}
+                onChange={handleChange}
+                error={errors.username}
+                required
+              />
+              {errors.username && <ErrorText>{errors.username}</ErrorText>}
+            </InputGroup>
+          </Row>
+          <Row>
+            <InputGroup>
+              <Input
+                type="email"
+                name="email"
+                placeholder="Email"
+                value={formData.email}
+                onChange={handleChange}
+                error={errors.email}
+                required
+              />
+              {errors.email && <ErrorText>{errors.email}</ErrorText>}
+            </InputGroup>
+            <InputGroup>
+              <Input
+                type="email"
+                name="verify_email"
+                placeholder="Verify Email"
+                value={formData.verify_email}
+                onChange={handleChange}
+                required
+              />
+            </InputGroup>
+          </Row>
+          <Row>
+            <InputGroup>
+              <Input
+                type="password"
+                name="password"
+                placeholder="Password"
+                value={formData.password}
+                onChange={handleChange}
+                error={errors.password}
+                required
+              />
+              <PasswordStrengthWrapper>
+                <PasswordStrengthText strength={passwordStrength}>{passwordStrength}</PasswordStrengthText>
+                <PasswordStrengthBar percentage={passwordStrengthPercentage}>
+                  <div />
+                </PasswordStrengthBar>
+              </PasswordStrengthWrapper>
+            </InputGroup>
+            <InputGroup>
+              <Input
+                type="password"
+                name="verify_password"
+                placeholder="Verify Password"
+                value={formData.verify_password}
+                onChange={handleChange}
+                required
+              />
+              {errors.password && <ErrorText>{errors.password}</ErrorText>}
+            </InputGroup>
+          </Row>
           <CheckboxContainer>
             <input
               type="checkbox"
               name="accepted_terms_and_privacy"
               checked={formData.accepted_terms_and_privacy}
-              onChange={handleChange}
+              onChange={(e) => handleChange(e)}
               required
             />
-            <label>
-              I accept the <a href="/terms">Terms and Conditions</a> and{" "}
-              <a href="/privacy">Privacy Policy</a>.
-            </label>
+            <label>I accept the Terms and Conditions and Privacy Policy.</label>
           </CheckboxContainer>
+          {errors.terms && <ErrorText>{errors.terms}</ErrorText>}
           <Button type="submit" disabled={isLoading}>
             {isLoading ? "Registering..." : "Register"}
           </Button>
         </Form>
-        {errorMessage && <ErrorMessage>{errorMessage}</ErrorMessage>}
       </FormWrapper>
     </Container>
   );

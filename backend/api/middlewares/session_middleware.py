@@ -20,6 +20,8 @@ class SessionValidationMiddleware(BaseHTTPMiddleware):
             "/api/auth/reset-password",
             "/api/auth/verify-email",
             "/api/subscriptions/",
+            "/api/user/profile/version",
+            "/api/subscriptions/version",
         ]
 
         # Check if the route is in the list of public routes

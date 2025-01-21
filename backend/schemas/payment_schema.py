@@ -13,9 +13,11 @@ class PaymentPlatform(str, Enum):
 
 
 class PaymentStatus(str, Enum):
-    PENDING = "pending"
-    SUCCESS = "success"
-    FAILED = "failed"
+    PENDING = "PENDING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    PAID = "paid"
+    COMPLETE = "complete"
 
 
 # Base Subscription Tier Schema
@@ -53,6 +55,7 @@ class SubscriptionTierBase(BaseModel):
     max_saved_workouts: int = Field(..., description="Maximum number of saved workouts allowed")
     max_messages_per_day: int = Field(..., description="Maximum number of messages allowed per day")
     recurring_interval: str = Field(..., description="Recurring interval for the subscription")
+    version: int = Field(..., description="Version of the subscription tier")  # Added field
 
     class Config:
         orm_mode = True
@@ -92,9 +95,11 @@ class SubscriptionTierOut(BaseModel):
     max_saved_workouts: int = Field(..., description="Maximum number of saved workouts")
     max_messages_per_day: int = Field(..., description="Maximum number of messages per day")
     recurring_interval: str = Field(..., description="Recurring interval for the subscription")
+    version: int = Field(..., description="Version of the subscription tier")  # Added field
 
     class Config:
         orm_mode = True
+
 
 
 # Payment Create Schema

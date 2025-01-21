@@ -161,7 +161,7 @@ const ContinueButton = styled.button`
 `;
 
 const SubscriptionSelection = () => {
-  const { currentUser } = useContext(AuthContext);
+  const { currentUser, loadUser } = useContext(AuthContext);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [subscriptionTiers, setSubscriptionTiers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -173,18 +173,26 @@ const SubscriptionSelection = () => {
       return;
     }
 
-    if (currentUser.setup_step !== "subscription_selection") {
-      const redirectPath = currentUser.is_verified
-        ? currentUser.profile_completed
-          ? "/dashboard"
-          : "/profile_completion"
-        : "/verify_email";
-
-      navigate(redirectPath);
+    // Handle redirection based on updated setup steps
+    if (currentUser.setup_step === "profile_completion") {
+      navigate("/profile-setup");
+    } else if (currentUser.setup_step === "subscription_selection") {
+      // Allow to stay on the subscription selection page
+    } else if (currentUser.setup_step === "completed") {
+      navigate("/dashboard");
+    } else {
+      navigate("/verify_email");
     }
   }, [currentUser, navigate]);
 
   useEffect(() => {
+    const storedPlan = sessionStorage.getItem("selectedPlan");
+
+    if (storedPlan) {
+      setSelectedPlan(JSON.parse(storedPlan));
+      sessionStorage.removeItem("selectedPlan");
+    }
+
     const fetchTiers = async () => {
       try {
         const tiers = await getAllSubscriptions();
@@ -193,6 +201,7 @@ const SubscriptionSelection = () => {
         toast.error("Failed to fetch subscription tiers.");
       }
     };
+
     fetchTiers();
   }, []);
 
@@ -225,8 +234,11 @@ const SubscriptionSelection = () => {
         navigate("/dashboard");
       } else {
         const payment = await createStripePayment(selectedPlan.id);
+
         if (payment.url) {
-          window.location.href = payment.url; // Correctly use the `url` field
+          sessionStorage.setItem("returnPath", "/choose-subscription");
+          sessionStorage.setItem("selectedPlan", JSON.stringify(selectedPlan));
+          window.location.href = payment.url;
         } else {
           throw new Error("Payment URL not received from the server.");
         }

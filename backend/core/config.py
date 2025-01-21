@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     # Stripe API keys
     STRIPE_PUBLIC_KEY: str = os.getenv("STRIPE_PUBLIC_KEY", "your_stripe_public_key")
     STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "your_stripe_secret_key")
+    STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "your_stripe_secret_key")
 
     BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
@@ -54,6 +55,10 @@ class Settings(BaseSettings):
     MAIL_STARTTLS: bool = os.getenv("MAIL_STARTTLS", "True").lower() == "true"
     MAIL_SSL_TLS: bool = os.getenv("MAIL_SSL_TLS", "False").lower() == "true"
     USE_CREDENTIALS: bool = os.getenv("USE_CREDENTIALS", "True").lower() == "true"
+
+    #CELERY
+    CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+    CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
 
     #AWS
     AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID", "your_access_key_id")

@@ -37,9 +37,8 @@ const handleError = (error) => {
  */
 export const createStripePayment = async (subscriptionTier) => {
   try {
-    // Add subscription_tier as a query parameter
     const response = await apiClient.post(`/create?subscription_tier=${subscriptionTier}`);
-    return response.data; // Expected to include the Stripe session URL
+    return response.data;
   } catch (error) {
     handleError(error);
   }
@@ -59,13 +58,35 @@ export const subscribeFreeTier = async () => {
 };
 
 /**
- * Verify a payment status with the platform
- * @param {Object} verificationData - Contains payment_id and platform-specific information
+ * Verify a payment status with the platform using session ID
+ * @param {string} sessionId - The Stripe session ID to verify
  * @returns {Object} Updated payment record
  */
-export const verifyPayment = async (verificationData) => {
+export const verifyPayment = async (sessionId) => {
+  if (!sessionId || typeof sessionId !== "string") {
+    throw new Error("Invalid session ID");
+  }
+
   try {
-    const response = await apiClient.post("/verify", verificationData);
+    const response = await apiClient.post(`/verify?session_id=${sessionId}`);
+    if (response.data.success) {
+      toast.success("Payment successfully verified!");
+    } else {
+      toast.error("Payment verification failed. Please try again.");
+    }
+    return response.data;  // Returns the updated payment record
+  } catch (error) {
+    handleError(error);
+  }
+};
+
+/**
+ * Handle Stripe payment cancelation
+ * @returns {Object} Server acknowledgment or status
+ */
+export const cancelPayment = async () => {
+  try {
+    const response = await apiClient.post("/cancel");
     return response.data;
   } catch (error) {
     handleError(error);

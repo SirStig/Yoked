@@ -60,24 +60,6 @@ const ResendLink = styled.p`
   }
 `;
 
-const Loader = styled.div`
-  border: 4px solid ${({ theme }) => theme.colors.inputBackground};
-  border-top: 4px solid ${({ theme }) => theme.colors.primary};
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 1s linear infinite;
-
-  @keyframes spin {
-    0% {
-      transform: rotate(0deg);
-    }
-    100% {
-      transform: rotate(360deg);
-    }
-  }
-`;
-
 const Verification = () => {
   const [status, setStatus] = useState("loading");
   const [cooldown, setCooldown] = useState(0); // Cooldown for resend button
@@ -86,35 +68,51 @@ const Verification = () => {
   const { currentUser, loadUser, loading } = useContext(AuthContext);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      if (!loading && currentUser) {
-        await loadUser(); // Refresh user data
-        if (currentUser.is_verified) {
-          setStatus("success");
-          clearInterval(interval); // Stop polling when verified
-        }
-      }
-    }, 2000); // Poll every 2 seconds
+    const verifyStatus = async () => {
+      const queryStatus = searchParams.get("status");
 
-    return () => clearInterval(interval);
-  }, [currentUser, loading, loadUser]);
+      if (queryStatus) {
+        setStatus(queryStatus);
+      } else if (currentUser?.is_verified) {
+        setStatus("success");
+      } else {
+        setStatus("pending");
+      }
+    };
+
+    verifyStatus();
+  }, [searchParams, currentUser]);
 
   useEffect(() => {
-    if (loading) return;
+    const pollStatus = async (retries = 0) => {
+      try {
+        if (!loading && currentUser) {
+          await loadUser(); // Refresh user data
+          if (currentUser.is_verified) {
+            setStatus("success");
+          } else {
+            throw new Error("Not verified yet");
+          }
+        }
+      } catch (err) {
+        if (retries < 5) {
+          const delay = Math.pow(2, retries) * 1000; // Exponential backoff
+          setTimeout(() => pollStatus(retries + 1), delay);
+        } else {
+          setStatus("error");
+          toast.error("Unable to verify email. Please try again later.");
+        }
+      }
+    };
 
-    const queryStatus = searchParams.get("status");
-    if (queryStatus) {
-      setStatus(queryStatus);
-    } else if (currentUser?.is_verified) {
-      setStatus("success");
-    } else {
-      setStatus("pending");
+    if (status === "pending") {
+      pollStatus();
     }
-  }, [loading, searchParams, currentUser]);
+  }, [status, currentUser, loading, loadUser]);
 
   const handleNextStep = () => {
     if (status === "success") {
-      navigate("/profile_completion");
+      navigate("/profile-setup"); // updated route name
     } else {
       toast.error("Please verify your email before proceeding.");
     }
@@ -135,12 +133,18 @@ const Verification = () => {
     }
   };
 
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
   return (
     <Container>
       {status === "loading" ? (
         <>
           <Message>Verifying your email...</Message>
-          <Loader />
         </>
       ) : (
         <>

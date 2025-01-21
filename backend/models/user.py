@@ -55,6 +55,9 @@ class User(Base):
     height_unit = Column(String, default="ft/in")
     weight_unit = Column(String, default="lbs")
 
+    # Versioning for profile changes
+    profile_version = Column(Integer, nullable=False, default=1)
+
     # Privacy fields
     accepted_terms = Column(Boolean, nullable=False)
     accepted_privacy_policy = Column(Boolean, nullable=False)

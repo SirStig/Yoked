@@ -71,8 +71,17 @@ const Dashboard = () => {
     if (!currentUser) {
       navigate("/login");
     } else if (currentUser.setup_step !== "completed") {
-      // Redirect to the setup step if not completed
-      navigate(`/setup/${currentUser.setup_step}`);
+      switch (currentUser.setup_step) {
+        case "profile_completion":
+          navigate("/profile-setup");
+          break;
+        case "subscription_selection":
+          navigate("/choose-subscription");
+          break;
+        default:
+          navigate("/verify_email");
+          break;
+      }
     }
   }, [currentUser, navigate]);
 
