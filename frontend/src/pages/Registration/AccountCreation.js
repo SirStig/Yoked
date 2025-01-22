@@ -63,7 +63,7 @@ const BackButton = styled.button`
   padding: 0.5rem;
   background-color: transparent;
   border: none;
-  color: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.textPrimary};
   font-size: 1.5rem;
   cursor: pointer;
 
@@ -113,6 +113,7 @@ const PasswordStrengthWrapper = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  width: 100%; /* Ensure the strength bar is the same width as the input fields */
 `;
 
 const PasswordStrengthText = styled.div`
@@ -194,7 +195,7 @@ const AccountCreation = () => {
     if (!password) return { strength: "", percentage: 0 };
 
     let score = 0;
-    if (password.length >= 8) score += 1; // Minimum length
+    if (password.length >= 8) score += 1; // Minimum length of 8
     if (/[A-Z]/.test(password)) score += 1; // Uppercase letter
     if (/[a-z]/.test(password)) score += 1; // Lowercase letter
     if (/[0-9]/.test(password)) score += 1; // Number
@@ -214,7 +215,7 @@ const AccountCreation = () => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    if (name === "password") {
+    if (name === "password" || name === "verify_password") {
       const { strength, percentage } = calculatePasswordStrength(value);
       setPasswordStrength(strength);
       setPasswordStrengthPercentage(percentage);
@@ -225,34 +226,51 @@ const AccountCreation = () => {
     navigate("/"); // Navigate to the home page when back button is clicked
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const newErrors = {};
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  const newErrors = {};
 
-    if (formData.email !== formData.verify_email) newErrors.email = "Emails do not match.";
-    if (formData.password !== formData.verify_password) newErrors.password = "Passwords do not match.";
-    if (!formData.accepted_terms_and_privacy) newErrors.terms = "You must accept the terms to proceed.";
+  // Validate email and password match
+  if (formData.email !== formData.verify_email) newErrors.email = "Emails do not match.";
+  if (formData.password !== formData.verify_password) newErrors.password = "Passwords do not match.";
+  if (!formData.accepted_terms_and_privacy) newErrors.terms = "You must accept the terms to proceed.";
 
-    setErrors(newErrors);
+  setErrors(newErrors);
 
-    if (Object.keys(newErrors).length > 0) return;
+  // If there are validation errors, stop submission
+  if (Object.keys(newErrors).length > 0) return;
 
-    setIsLoading(true);
+  setIsLoading(true);
 
-    try {
-      const {username, full_name, email, password} = formData;
-      await register({username, full_name, email, password});
-      toast.success("Account created successfully! Please verify your email.");
-      navigate("/verify_email");  // Direct the user to verify their email
-    } catch (err) {
-      const error = err.response?.data?.detail || "Registration failed. Please try again.";
-      if (error.includes("email")) newErrors.email = error;
-      if (error.includes("username")) newErrors.username = error;
-      setErrors(newErrors);
-    } finally {
-      setIsLoading(false);
+  try {
+    const { username, full_name, email, password } = formData;
+
+    // Call the register function
+    await register({ username, full_name, email, password });
+
+    // Success: notify the user and redirect to verification
+    toast.success("Account created successfully! Please verify your email.");
+    navigate("/verify-email");
+  } catch (err) {
+    // Handle specific backend errors
+    const backendErrors = {};
+    if (err?.errors) {
+      Object.entries(err.errors).forEach(([field, messages]) => {
+        backendErrors[field] = messages.join(" ");
+        toast.error(`${field}: ${messages.join(" ")}`);
+      });
+    } else {
+      // General error
+      const errorMessage = err?.detail || "Registration failed. Please try again.";
+      toast.error(errorMessage);
     }
-  };
+
+    // Update local errors state for field-specific error display
+    setErrors(backendErrors);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <Container>
@@ -328,8 +346,10 @@ const AccountCreation = () => {
                 required
               />
               <PasswordStrengthWrapper>
-                <PasswordStrengthText strength={passwordStrength}>{passwordStrength}</PasswordStrengthText>
-                <PasswordStrengthBar percentage={passwordStrengthPercentage}>
+                <PasswordStrengthText $strength={passwordStrength}>
+                  {passwordStrength}
+                </PasswordStrengthText>
+                <PasswordStrengthBar $percentage={passwordStrengthPercentage}>
                   <div />
                 </PasswordStrengthBar>
               </PasswordStrengthWrapper>

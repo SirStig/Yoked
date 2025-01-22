@@ -9,11 +9,16 @@ const apiClient = axios.create({
   },
 });
 
+// Log the base URL during setup for diagnostics
+console.log(`API Client initialized with baseURL: ${apiClient.defaults.baseURL}`);
+
 // Attach Authorization header to requests if token is available
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    console.warn("No authorization token found.");
   }
   return config;
 });
@@ -21,14 +26,22 @@ apiClient.interceptors.request.use((config) => {
 // Normalize errors for consistency
 const handleError = (error) => {
   console.error("API Error:", error);
+
   if (error.response) {
-    console.error("Error Details:", error.response.data);
-    toast.error(error.response.data?.detail || "An unexpected error occurred.");
-    throw new Error(error.response.data?.detail || "An unexpected error occurred.");
-  } else {
-    toast.error("Network error. Please try again later.");
-    throw new Error("Network error. Please try again later.");
+    const { status, data } = error.response;
+    console.error("Error Details:", data);
+
+    const detail = data?.detail || "An unexpected error occurred.";
+    toast.error(detail);
+
+    // Return structured error
+    return Promise.reject({ message: detail, status, data });
   }
+
+  // Handle network errors
+  const networkError = { message: "Network error. Please try again later.", status: 0 };
+  toast.error(networkError.message);
+  return Promise.reject(networkError);
 };
 
 // Caching layer for profile version
@@ -48,7 +61,7 @@ export const registerUser = async (userData) => {
     console.log("Register API Response:", response.data);
     return response.data;
   } catch (error) {
-    handleError(error);
+    return handleError(error);
   }
 };
 
@@ -70,7 +83,7 @@ export const loginUser = async (email, password, isMobile = false) => {
 
     return response.data;
   } catch (error) {
-    handleError(error);
+    return handleError(error);
   }
 };
 
@@ -87,7 +100,7 @@ export const logoutUser = async () => {
 
     return response.data;
   } catch (error) {
-    handleError(error);
+    return handleError(error);
   }
 };
 
@@ -103,6 +116,6 @@ export const getProfileVersion = async () => {
 
     return version;
   } catch (error) {
-    handleError(error);
+    return handleError(error);
   }
 };

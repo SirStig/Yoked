@@ -32,3 +32,9 @@ coverage.xml
 .DS_Store
 .gitignore
 .idea/
+
+.bak
+.dat
+.dir
+.log.
+.log

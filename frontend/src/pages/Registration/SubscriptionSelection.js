@@ -181,7 +181,7 @@ const SubscriptionSelection = () => {
     } else if (currentUser.setup_step === "completed") {
       navigate("/dashboard");
     } else {
-      navigate("/verify_email");
+      navigate("/verify-email");
     }
   }, [currentUser, navigate]);
 

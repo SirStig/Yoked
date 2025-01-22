@@ -13,7 +13,7 @@ const Container = styled.div`
   height: 100vh;
   background-color: ${({ theme }) => theme.colors.secondary};
   color: ${({ theme }) => theme.colors.textPrimary};
-  gap: 1.5rem; /* Space between elements */
+  gap: 1.5rem;
 `;
 
 const Message = styled.h1`
@@ -62,57 +62,46 @@ const ResendLink = styled.p`
 
 const Verification = () => {
   const [status, setStatus] = useState("loading");
-  const [cooldown, setCooldown] = useState(0); // Cooldown for resend button
+  const [cooldown, setCooldown] = useState(0);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { currentUser, loadUser, loading } = useContext(AuthContext);
 
+  // Set status based on query string or currentUser
   useEffect(() => {
-    const verifyStatus = async () => {
-      const queryStatus = searchParams.get("status");
+    const queryStatus = searchParams.get("status");
 
-      if (queryStatus) {
-        setStatus(queryStatus);
-      } else if (currentUser?.is_verified) {
-        setStatus("success");
-      } else {
-        setStatus("pending");
-      }
-    };
-
-    verifyStatus();
+    if (queryStatus) {
+      setStatus(queryStatus);
+    } else if (currentUser?.is_verified) {
+      setStatus("success");
+    } else {
+      setStatus("pending");
+    }
   }, [searchParams, currentUser]);
 
+  // Polling verification status every 5 seconds
   useEffect(() => {
-    const pollStatus = async (retries = 0) => {
-      try {
-        if (!loading && currentUser) {
-          await loadUser(); // Refresh user data
-          if (currentUser.is_verified) {
+    const interval = setInterval(async () => {
+      if (!loading && currentUser) {
+        try {
+          await loadUser();
+          if (currentUser?.is_verified) {
             setStatus("success");
-          } else {
-            throw new Error("Not verified yet");
           }
-        }
-      } catch (err) {
-        if (retries < 5) {
-          const delay = Math.pow(2, retries) * 1000; // Exponential backoff
-          setTimeout(() => pollStatus(retries + 1), delay);
-        } else {
+        } catch (err) {
+          console.error("Failed to load user status:", err);
           setStatus("error");
-          toast.error("Unable to verify email. Please try again later.");
         }
       }
-    };
+    }, 5000); // Poll every 5 seconds
 
-    if (status === "pending") {
-      pollStatus();
-    }
-  }, [status, currentUser, loading, loadUser]);
+    return () => clearInterval(interval);
+  }, [currentUser, loading, loadUser]);
 
   const handleNextStep = () => {
     if (status === "success") {
-      navigate("/profile-setup"); // updated route name
+      navigate("/profile-completion");
     } else {
       toast.error("Please verify your email before proceeding.");
     }
@@ -120,19 +109,26 @@ const Verification = () => {
 
   const handleResendEmail = async () => {
     try {
-      await fetch("/api/auth/resend-verification", {
+      const response = await fetch("/api/auth/resend-verification", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
+
+      if (!response.ok) {
+        throw new Error("Failed to resend verification email");
+      }
+
       toast.success("Verification email resent! Please check your inbox.");
       setCooldown(30); // Start cooldown
-    } catch {
+    } catch (error) {
+      console.error("Resend email error:", error);
       toast.error("Failed to resend verification email.");
     }
   };
 
+  // Cooldown timer for resend email
   useEffect(() => {
     if (cooldown > 0) {
       const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
@@ -140,48 +136,60 @@ const Verification = () => {
     }
   }, [cooldown]);
 
-  return (
-    <Container>
-      {status === "loading" ? (
+  const renderContent = () => {
+    if (status === "loading") {
+      return <Message>Verifying your email...</Message>;
+    }
+
+    if (status === "error") {
+      return (
         <>
-          <Message>Verifying your email...</Message>
-        </>
-      ) : (
-        <>
-          <Message>
-            {status === "success"
-              ? "Email Verified Successfully!"
-              : status === "already_verified"
-              ? "Email Already Verified"
-              : status === "expired"
-              ? "Verification Link Expired"
-              : status === "invalid"
-              ? "Invalid Verification Link"
-              : "Verification Pending"}
-          </Message>
+          <Message>Something Went Wrong</Message>
           <Description>
-            {status === "success"
-              ? "Your email has been verified. Let's complete your profile."
-              : status === "already_verified"
-              ? "Your email has already been verified. Proceed to the next step."
-              : status === "expired"
-              ? "The verification link has expired. Please request a new one."
-              : status === "invalid"
-              ? "The verification link is invalid. Please request a new one."
-              : "We sent you a verification email. Please check your inbox and click the link to proceed."}
+            There was an issue verifying your email. Please try again or contact support if the issue persists.
           </Description>
-          <Button onClick={handleNextStep} disabled={status !== "success"}>
-            Continue
-          </Button>
-          {(status === "pending" || status === "expired") && (
-            <ResendLink onClick={handleResendEmail}>
-              {cooldown > 0 ? `Resend email in ${cooldown}s` : "Send another email"}
-            </ResendLink>
-          )}
+          <Button onClick={() => navigate("/")}>Go to Home</Button>
         </>
-      )}
-    </Container>
-  );
+      );
+    }
+
+    return (
+      <>
+        <Message>
+          {status === "success"
+            ? "Email Verified Successfully!"
+            : status === "already_verified"
+            ? "Email Already Verified"
+            : status === "expired"
+            ? "Verification Link Expired"
+            : status === "invalid"
+            ? "Invalid Verification Link"
+            : "Verification Pending"}
+        </Message>
+        <Description>
+          {status === "success"
+            ? "Your email has been verified. Let's complete your profile."
+            : status === "already_verified"
+            ? "Your email has already been verified. Proceed to the next step."
+            : status === "expired"
+            ? "The verification link has expired. Please request a new one."
+            : status === "invalid"
+            ? "The verification link is invalid. Please request a new one."
+            : "We sent you a verification email. Please check your inbox and click the link to proceed."}
+        </Description>
+        <Button onClick={handleNextStep} disabled={status !== "success"}>
+          Continue
+        </Button>
+        {(status === "pending" || status === "expired") && (
+          <ResendLink onClick={handleResendEmail}>
+            {cooldown > 0 ? `Resend email in ${cooldown}s` : "Send another email"}
+          </ResendLink>
+        )}
+      </>
+    );
+  };
+
+  return <Container>{renderContent()}</Container>;
 };
 
 export default Verification;

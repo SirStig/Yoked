@@ -25,7 +25,7 @@ const BackgroundImage = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  background: url("https://images.pexels.com/photos/669577/pexels-photo-669577.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2")
+  background: url("https://images.pexels.com/photos/6389886/pexels-photo-6389886.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2")
     no-repeat center center/cover;
   z-index: 0;
 
@@ -91,22 +91,22 @@ const Card = styled.div`
   @keyframes fadeIn {
     from {
       opacity: 0;
-      transform: translateX(100%);
+      transform: translate3d(100%, 0, 0);
     }
     to {
       opacity: 1;
-      transform: translateX(0);
+      transform: translate3d(0, 0, 0);
     }
   }
 
   @keyframes fadeOut {
     from {
       opacity: 1;
-      transform: translateX(0);
+      transform: translate3d(0, 0, 0);
     }
     to {
       opacity: 0;
-      transform: translateX(-100%);
+      transform: translate3d(-100%, 0, 0);
     }
   }
 `;
@@ -188,36 +188,31 @@ const ProfileCompletion = () => {
     navigate("/");
   };
 
+  const convertHeightToCm = () => {
+    if (profileData.height_unit === "cm") return parseInt(profileData.height.cm, 10);
+    const feetInches = profileData.height.ft * 12 + parseInt(profileData.height.in, 10);
+    return feetInches * 2.54;
+  };
+
+  const convertWeightToKg = () => {
+    if (profileData.weight_unit === "kg") return parseFloat(profileData.weight);
+    return parseFloat(profileData.weight) * 0.453592;
+  };
+
   const handleSubmit = async () => {
-    let heightValue;
-    let weightValue;
-
-    // Convert height to the appropriate unit (e.g., in cm)
-    if (profileData.height_unit === "cm") {
-      heightValue = parseInt(profileData.height.cm, 10);
-    } else if (profileData.height_unit === "ft") {
-      const feetInches = profileData.height.ft * 12 + profileData.height.in;
-      heightValue = feetInches * 2.54; // Convert to cm
-    }
-
-    // Convert weight to the appropriate unit (e.g., kg)
-    if (profileData.weight_unit === "kg") {
-      weightValue = parseFloat(profileData.weight);
-    } else if (profileData.weight_unit === "lbs") {
-      weightValue = parseFloat(profileData.weight) * 0.453592; // Convert to kg
-    }
-
     try {
-      // Send numeric values to backend
+      const heightValue = convertHeightToCm();
+      const weightValue = convertWeightToKg();
+
       await updateProfile({
         ...profileData,
         height: heightValue,
         weight: weightValue,
-        setup_step: "subscription-selection",
+        setup_step: "subscription_selection",
       });
       await loadUser();
       toast.success("Profile updated successfully!");
-      navigate("/choose-subscription");  // Redirect after completion
+      navigate("/choose-subscription");
     } catch (error) {
       toast.error(error.message || "Failed to update profile.");
     }
@@ -232,15 +227,11 @@ const ProfileCompletion = () => {
             type="number"
             placeholder="Age"
             value={profileData.age}
-            onChange={(e) =>
-              setProfileData((prev) => ({ ...prev, age: e.target.value }))
-            }
+            onChange={(e) => setProfileData((prev) => ({ ...prev, age: e.target.value }))}
           />
           <Dropdown
             value={profileData.gender}
-            onChange={(e) =>
-              setProfileData((prev) => ({ ...prev, gender: e.target.value }))
-            }
+            onChange={(e) => setProfileData((prev) => ({ ...prev, gender: e.target.value }))}
           >
             <option value="">Select Gender</option>
             <option value="male">Male</option>

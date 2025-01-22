@@ -95,7 +95,7 @@ const LinkText = styled.p`
   margin-top: 1rem;
 
   a {
-    color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.textPrimary};
     text-decoration: none;
 
     &:hover {
@@ -106,7 +106,7 @@ const LinkText = styled.p`
   button {
     background-color: transparent;
     border: none;
-    color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.textPrimary};
     font-size: 1rem;
     cursor: pointer;
 
@@ -123,7 +123,7 @@ const BackButton = styled.button`
   padding: 0.5rem;
   background-color: transparent;
   border: none;
-  color: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.textPrimary};
   font-size: 1.5rem;
   cursor: pointer;
 
@@ -156,7 +156,7 @@ const Login = () => {
       } else if (user?.setup_step === "subscription_selection") {
         navigate("/choose-subscription");
       } else if (user?.setup_step === "verify_email") {
-        navigate("/verify_email");
+        navigate("/verify-email");
       } else {
         navigate("/dashboard"); // Fallback path in case setup_step is undefined
       }

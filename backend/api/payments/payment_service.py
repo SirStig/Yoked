@@ -85,8 +85,8 @@ def create_stripe_payment(user: User, subscription_tier_id: str, db: Session) ->
                 "quantity": 1,
             }],
             mode="subscription",
-            success_url=f"{settings.FRONTEND_URL}/success?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{settings.FRONTEND_URL}/cancel?session_id={{CHECKOUT_SESSION_ID}}",
+            success_url=f"{settings.FRONTEND_URL}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{settings.FRONTEND_URL}/payment-cancel?session_id={{CHECKOUT_SESSION_ID}}",
             metadata={
                 "user_id": str(user.id),
                 "user_email": user.email,

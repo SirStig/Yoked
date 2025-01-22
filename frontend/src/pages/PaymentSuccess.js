@@ -3,6 +3,8 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import styled, { css } from "styled-components";
 import { toast } from "react-toastify";
 import { verifyPayment } from "../api/paymentApi";
+import { useContext } from "react";
+import { AuthContext } from "../contexts/AuthContext"; // Import AuthContext
 
 // Styled Components
 const Container = styled.div`
@@ -46,6 +48,7 @@ const PaymentSuccess = () => {
   const [message, setMessage] = useState("Verifying payment...");
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { loadUser } = useContext(AuthContext); // Access loadUser from AuthContext
 
   useEffect(() => {
     const verifyPaymentSession = async () => {
@@ -59,9 +62,12 @@ const PaymentSuccess = () => {
       }
 
       try {
-        const response = await verifyPayment(sessionId); // Pass the sessionId directly
+        const response = await verifyPayment(sessionId);
         setMessage(response.message || "Payment verified successfully!");
         setSuccess(true);
+
+        // Reload the user profile after a successful payment verification
+        await loadUser(true); // Force the user profile to reload
       } catch (error) {
         setMessage(error.message || "Payment verification failed. Please try again.");
         setSuccess(false);
@@ -71,7 +77,7 @@ const PaymentSuccess = () => {
     };
 
     verifyPaymentSession();
-  }, [searchParams]);
+  }, [searchParams, loadUser]); // Make sure loadUser is part of the dependency array
 
   const handleRedirect = () => {
     navigate(success ? "/dashboard" : "/choose-subscription");

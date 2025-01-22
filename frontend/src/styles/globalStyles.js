@@ -22,14 +22,12 @@ const GlobalStyles = createGlobalStyle`
     }
   }
 
-  @keyframes scale-up {
-    from {
-      transform: scale(0.9);
-      opacity: 0;
-    }
-    to {
+  @keyframes hover-pulse {
+    0%, 100% {
       transform: scale(1);
-      opacity: 1;
+    }
+    50% {
+      transform: scale(1.05);
     }
   }
 
@@ -41,9 +39,7 @@ const GlobalStyles = createGlobalStyle`
   }
 
   body {
-    margin: 0;
-    padding: 0;
-    background-color: ${({ theme }) => theme.colors.secondary}; /* Use dark theme background */
+    background-color: ${({ theme }) => theme.colors.secondary};
     color: ${({ theme }) => theme.colors.textPrimary};
     font-family: ${({ theme }) => theme.font.family};
     font-size: ${({ theme }) => theme.font.size};
@@ -54,27 +50,30 @@ const GlobalStyles = createGlobalStyle`
   }
 
   a {
-    color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.link};
     text-decoration: none;
-    transition: color ${({ theme }) => theme.transitions.default};
+    font-weight: ${({ theme }) => theme.font.weightBold};
+    transition: ${({ theme }) => theme.transitions.default};
 
     &:hover {
-      color: ${({ theme }) => theme.colors.accent};
+      color: ${({ theme }) => theme.colors.linkHover};
     }
   }
 
   button {
     font-family: ${({ theme }) => theme.font.family};
-    background-color: ${({ theme }) => theme.colors.primary};
+    background: ${({ theme }) => theme.colors.gradientPrimary};
     color: ${({ theme }) => theme.colors.textPrimary};
     border: none;
     padding: ${({ theme }) => theme.spacing(2)} ${({ theme }) => theme.spacing(3)};
     border-radius: ${({ theme }) => theme.borderRadius};
     cursor: pointer;
-    transition: background-color ${({ theme }) => theme.transitions.default};
+    transition: ${({ theme }) => theme.transitions.hoverGlow};
+    box-shadow: ${({ theme }) => theme.shadows.light};
 
     &:hover {
-      background-color: ${({ theme }) => theme.colors.primaryHover};
+      box-shadow: ${({ theme }) => theme.shadows.glow};
+      transform: scale(1.02); /* Subtle lift effect */
     }
 
     &:disabled {
@@ -84,19 +83,31 @@ const GlobalStyles = createGlobalStyle`
   }
 
   h1, h2, h3 {
-    margin: 0;
-    padding: 0;
     font-family: ${({ theme }) => theme.font.family};
     font-weight: ${({ theme }) => theme.font.weightBold};
     color: ${({ theme }) => theme.colors.textPrimary};
+    text-align: center;
   }
 
   h1 {
-    font-size: 2.5rem;
+    font-size: ${({ theme }) => theme.font.headingSize};
+    position: relative;
+
+    &::after {
+      content: "";
+      width: 50%;
+      height: 4px;
+      background: ${({ theme }) => theme.colors.primary};
+      display: block;
+      margin: ${({ theme }) => theme.spacing(2)} auto 0;
+      border-radius: ${({ theme }) => theme.borderRadius};
+    }
   }
 
   h2 {
-    font-size: 2rem;
+    font-size: ${({ theme }) => theme.font.subheadingSize};
+    text-transform: uppercase;
+    color: ${({ theme }) => theme.colors.accent};
   }
 
   h3 {
@@ -104,9 +115,8 @@ const GlobalStyles = createGlobalStyle`
   }
 
   p {
-    margin: 0;
     line-height: 1.6;
-    font-size: 1rem;
+    font-size: 1.1rem;
     color: ${({ theme }) => theme.colors.textSecondary};
   }
 
@@ -133,26 +143,86 @@ const GlobalStyles = createGlobalStyle`
     resize: none;
   }
 
-  ul {
-    list-style: none;
-    padding: 0;
+  /* Card Styles */
+  .card {
+    background: ${({ theme }) => theme.colors.gradientSecondary};
+    box-shadow: ${({ theme }) => theme.shadows.medium};
+    border-radius: ${({ theme }) => theme.borderRadius};
+    padding: ${({ theme }) => theme.spacing(3)};
+    margin-bottom: ${({ theme }) => theme.spacing(4)};
+    transition: ${({ theme }) => theme.transitions.hoverGlow};
+
+    &:hover {
+      box-shadow: ${({ theme }) => theme.shadows.glow};
+      transform: scale(1.05); /* Slight lift on hover */
+    }
   }
 
-  img {
-    max-width: 100%;
-    height: auto;
-    display: block;
+  /* Footer */
+  footer {
+    background: ${({ theme }) => theme.colors.secondary};
+    color: ${({ theme }) => theme.colors.textSecondary};
+    padding: ${({ theme }) => theme.spacing(4)};
+    text-align: center;
+    box-shadow: ${({ theme }) => theme.shadows.light};
+
+    a {
+      color: ${({ theme }) => theme.colors.link};
+      transition: ${({ theme }) => theme.transitions.default};
+
+      &:hover {
+        color: ${({ theme }) => theme.colors.linkHover};
+      }
+    }
   }
 
-  /* Default fallback background for video sections */
+  /* Hero Section */
   .hero-section {
-    background-color: ${({ theme }) => theme.colors.secondary};
+    background: ${({ theme }) => theme.colors.gradientPrimary};
     min-height: 100vh;
-    position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
     color: ${({ theme }) => theme.colors.textPrimary};
+    text-align: center;
+    animation: slide-up 0.8s ease-in-out;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    body {
+      font-size: 0.9rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    body {
+      font-size: 0.8rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+    }
+
+    h3 {
+      font-size: 1rem;
+    }
   }
 `;
 

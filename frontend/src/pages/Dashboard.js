@@ -79,7 +79,7 @@ const Dashboard = () => {
           navigate("/choose-subscription");
           break;
         default:
-          navigate("/verify_email");
+          navigate("/verify-email");
           break;
       }
     }

@@ -13,8 +13,10 @@ import SubscriptionSelection from "./pages/Registration/SubscriptionSelection";
 import Dashboard from "./pages/Dashboard";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancel from "./pages/PaymentCancel";
+import NotFound from "./pages/NotFound";
 
-const ProtectedRoute = ({ children }) => {
+// ProtectedRoute for pages that need login and valid setup step
+const ProtectedRoute = ({ children, requiredSetupStep, allowOnCompleted = false }) => {
   const { currentUser, loading, loadUser } = useContext(AuthContext);
   const location = useLocation();
 
@@ -39,7 +41,7 @@ const ProtectedRoute = ({ children }) => {
 
   // Mapping setup_step to the corresponding paths
   const setupStepToPath = {
-    "verify_email": "/verify_email",
+    "verify_email": "/verify-email",
     "profile_completion": "/profile-setup",
     "subscription_selection": "/choose-subscription",
     "completed": "/dashboard"
@@ -47,14 +49,18 @@ const ProtectedRoute = ({ children }) => {
 
   const nextStepPath = setupStepToPath[currentUser.setup_step] || "/dashboard";
 
-  // Redirect to the appropriate setup page based on setup_step
-  if (currentUser.setup_step !== "completed" && currentPath !== nextStepPath) {
+  if (currentUser.setup_step !== requiredSetupStep && currentPath !== nextStepPath) {
     return <Navigate to={nextStepPath} replace />;
+  }
+
+  if (allowOnCompleted && currentUser.setup_step === "completed") {
+    return children;
   }
 
   return children;
 };
 
+// GuestRoute for pages accessible by anyone (logged in or not)
 const GuestRoute = ({ children, allowLoggedInHome = false }) => {
   const { currentUser, loading } = useContext(AuthContext);
 
@@ -108,9 +114,9 @@ const App = () => {
 
         {/* Setup Steps */}
         <Route
-          path="/verify_email"
+          path="/verify-email"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredSetupStep="verify_email">
               <Verification />
             </ProtectedRoute>
           }
@@ -118,7 +124,7 @@ const App = () => {
         <Route
           path="/profile-setup"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredSetupStep="profile_completion">
               <ProfileCompletion />
             </ProtectedRoute>
           }
@@ -126,18 +132,26 @@ const App = () => {
         <Route
           path="/choose-subscription"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredSetupStep="subscription_selection">
               <SubscriptionSelection />
             </ProtectedRoute>
           }
         />
 
-        {/* Payment Success Route */}
+        {/* Payment Success & Cancel */}
         <Route
           path="/payment-success"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredSetupStep="subscription_selection" allowOnCompleted>
               <PaymentSuccess />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payment-cancel"
+          element={
+            <ProtectedRoute requiredSetupStep="subscription_selection" allowOnCompleted>
+              <PaymentCancel />
             </ProtectedRoute>
           }
         />
@@ -146,12 +160,14 @@ const App = () => {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredSetupStep="completed">
               <Dashboard />
             </ProtectedRoute>
           }
         />
-      </Routes>
+       {/* Catch-all route */}
+        <Route path="*" element={<NotFound />} />
+        </Routes>
     </ThemeProvider>
   );
 };

@@ -1,46 +1,31 @@
-from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.security import HTTPBearer
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
-from jose import jwt
+from jose import jwt, JWTError, ExpiredSignatureError
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from backend.core.database import get_db
 from backend.api.auth.auth_service import (
-    create_user,
-    get_user_by_username,
-    hash_password,
-    get_current_user,
-    verify_password,
-    get_user_by_email,
+    create_user, get_user_by_username, get_user_by_email, verify_password,
+    hash_password, get_current_user,
 )
 from backend.schemas.user_schema import UserCreate, Token, LoginRequest
 from backend.core.config import settings
-from backend.services.session_service import (
-    create_session,
-    validate_session,
-    invalidate_session,
-    invalidate_specific_session,
-)
-from backend.models.user import User, SetupStep  # Importing User model
+from backend.services.session_service import create_session, validate_session, invalidate_session, invalidate_specific_session
+from backend.models.user import User, SetupStep
 from backend.core.logging_config import get_logger
-from uuid import UUID  # Ensure proper handling of UUIDs
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+from uuid import UUID
 
 auth_scheme = HTTPBearer()
-
-# Logger setup
 logger = get_logger(__name__)
-
-# Router setup
 router = APIRouter()
 
-# JWT Configuration
+# JWT and Email Configurations
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = "HS256"
 EMAIL_TOKEN_EXPIRE_MINUTES = 60
-
-# Email Configuration
 conf = ConnectionConfig(
     MAIL_USERNAME=settings.MAIL_USERNAME,
     MAIL_PASSWORD=settings.MAIL_PASSWORD,
@@ -51,16 +36,12 @@ conf = ConnectionConfig(
     MAIL_SSL_TLS=settings.MAIL_SSL_TLS,
     USE_CREDENTIALS=settings.USE_CREDENTIALS,
 )
-
-# Base URL for dynamic link generation
 BASE_URL = settings.BASE_URL
 FRONTEND_BASE_URL = settings.FRONTEND_URL
-
 email_cooldown_cache = {}
 
-# Helper function to send emails
+# Helper Function to Send Emails
 async def send_email(subject: str, recipient: str, body: str):
-    logger.debug("Preparing to send email")
     try:
         message = MessageSchema(
             subject=subject,
@@ -72,41 +53,81 @@ async def send_email(subject: str, recipient: str, body: str):
         await fm.send_message(message)
         logger.info(f"Email sent to {recipient}")
     except Exception as e:
-        logger.exception(f"Failed to send email to {recipient}: {e}")
-        raise HTTPException(status_code=500, detail="Email sending failed")
+        logger.error(f"Failed to send email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send email")
 
 
 # Route: Register user with email verification
 @router.post("/register", response_model=Token)
 async def register_user(user: UserCreate, db: Session = Depends(get_db)):
     if not user.accepted_privacy_policy or not user.accepted_terms:
-        raise HTTPException(status_code=400, detail="User must accept terms and conditions")
+        raise HTTPException(status_code=400, detail="You must accept terms and privacy policy")
 
     try:
-        existing_user = get_user_by_username(db, user.username)
-        if existing_user:
+        # Check for existing username or email
+        if get_user_by_username(db, user.username):
             raise HTTPException(status_code=400, detail="Username already registered")
+        if get_user_by_email(db, user.email):
+            raise HTTPException(status_code=400, detail="Email already registered")
 
         new_user = create_user(db, user)
         new_user.setup_step = SetupStep.email_verification
-        new_user.profile_version = 1  # Initialize profile_version
-        db.commit()  # Commit the user creation to the database
+        new_user.profile_version = 1
+        db.commit()
 
+        # Generate and send verification email
         token_data = {"sub": str(new_user.id), "type": "email_verification"}
         verification_token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
+        verification_link = f"{BASE_URL}/api/auth/verify-email?token={verification_token}"
+        await send_email("Verify Your Email", user.email, f"Click here to verify: {verification_link}")
+
+        # Create a session
         session_token = create_session(new_user.id, db)
-
-        verification_link = f"{settings.BASE_URL}/api/auth/verify-email?token={verification_token}"
-        email_body = f"Click the link to verify your email: <a href='{verification_link}'>{verification_link}</a>"
-        await send_email("Verify Your Email", user.email, email_body)
-
         return {"access_token": session_token, "token_type": "bearer", "status": "pending"}
 
+    except HTTPException as e:
+        logger.error(f"Registration failed: {e.detail}")
+        raise e
     except Exception as e:
+        logger.exception("Unexpected error during registration")
         raise HTTPException(status_code=500, detail="Registration failed")
 
 
-# Route: Login
+# Route: Verify email using token
+@router.get("/verify-email", include_in_schema=False)
+async def verify_email(token: str, db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "email_verification":
+            raise HTTPException(status_code=400, detail="Invalid token type")
+
+        user_id = UUID(payload.get("sub"))
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        if user.is_verified:
+            return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{urlencode({'status': 'already_verified'})}")
+
+        user.is_verified = True
+        user.setup_step = SetupStep.profile_completion
+        user.profile_version += 1
+        db.commit()
+
+        session_token = create_session(user.id, db)
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{urlencode({'status': 'success', 'token': session_token})}")
+
+    except ExpiredSignatureError:
+        logger.warning("Verification link expired")
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{urlencode({'status': 'expired'})}")
+    except JWTError:
+        logger.error("Invalid verification token")
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{urlencode({'status': 'invalid'})}")
+    except Exception as e:
+        logger.exception("Error during email verification")
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{urlencode({'status': 'error'})}")
+
+
 @router.post("/login", response_model=Token)
 def login(request: LoginRequest, db: Session = Depends(get_db)):
     """
@@ -133,46 +154,6 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     token = create_session(user.id, db, request.is_mobile)
     logger.info(f"Session created for email: {user.email}")
     return {"access_token": token, "token_type": "bearer"}
-
-
-# Route: Verify email using token
-@router.get("/verify-email", include_in_schema=False)
-async def verify_email(token: str, db: Session = Depends(get_db)):
-    logger.info("Processing email verification")
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("type") != "email_verification":
-            raise HTTPException(status_code=400, detail="Invalid token type")
-
-        user_id = UUID(payload.get("sub"))
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        if user.is_verified:
-            query_params = urlencode({"status": "already_verified"})
-            return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{query_params}")
-
-        # Mark the user as verified and increment the profile version
-        user.is_verified = True
-        user.setup_step = SetupStep.profile_completion
-        user.profile_version += 1  # Increment profile version
-        db.commit()
-
-        session_token = create_session(user.id, db)
-        query_params = urlencode({"status": "success", "token": session_token})
-        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{query_params}")
-
-    except jwt.ExpiredSignatureError:
-        query_params = urlencode({"status": "expired"})
-        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{query_params}")
-    except jwt.JWTError:
-        query_params = urlencode({"status": "invalid"})
-        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{query_params}")
-    except Exception:
-        query_params = urlencode({"status": "error"})
-        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/verify-email?{query_params}")
-
 
 # Route: Resend verification email
 @router.post("/resend-verification")
