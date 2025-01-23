@@ -242,11 +242,19 @@ const handleSubmit = async (e) => {
 
   setIsLoading(true);
 
+  const payload = {
+        username: formData.username,
+        full_name: formData.full_name,
+        email: formData.email,
+        hashed_password: formData.password,
+        accepted_terms: true,
+        accepted_privacy_policy: true,
+      };
+
   try {
-    const { username, full_name, email, password } = formData;
 
     // Call the register function
-    await register({ username, full_name, email, password });
+    await register(payload);
 
     // Success: notify the user and redirect to verification
     toast.success("Account created successfully! Please verify your email.");

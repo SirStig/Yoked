@@ -7,7 +7,6 @@ from backend.core.logging_config import get_logger
 # Logger setup
 logger = get_logger(__name__)
 
-
 class SessionValidationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         # Allow OPTIONS requests to pass through
@@ -22,6 +21,8 @@ class SessionValidationMiddleware(BaseHTTPMiddleware):
             "/api/subscriptions/",
             "/api/user/profile/version",
             "/api/subscriptions/version",
+            "/api/admin/create",
+            "/api/admin/login",
         ]
 
         # Check if the route is in the list of public routes
@@ -40,12 +41,9 @@ class SessionValidationMiddleware(BaseHTTPMiddleware):
                     token = auth_header.split(" ")[1]
                     logger.debug(f"Extracted Token: {token}")
 
-                    # Manually retrieve a database session from the generator
-                    db = next(get_db())
-                    try:
-                        validate_session(token, db)  # Validate the session token
-                    finally:
-                        db.close()  # Ensure the database session is closed
+                    # Manually retrieve a database session using async-safe way
+                    async with get_db() as db:
+                        await validate_session(token, db)  # Ensure this is awaited
                 else:
                     return JSONResponse(
                         {"detail": "Unauthorized: Missing or invalid token"},
@@ -59,4 +57,3 @@ class SessionValidationMiddleware(BaseHTTPMiddleware):
                 )
 
         return await call_next(request)
-

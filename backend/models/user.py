@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Text, String, Boolean, ForeignKey, Table, DateTime, Enum, func, UUID
+from sqlalchemy import Column, Integer, Text, String, Boolean, ForeignKey, Table, DateTime, Enum, func, UUID, ARRAY
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from backend.core.database import Base
@@ -19,6 +19,10 @@ class SetupStep(PyEnum):
     profile_completion = "profile_completion"
     subscription_selection = "subscription_selection"
     completed = "completed"
+
+class UserType(PyEnum):
+    REGULAR = "regular"
+    ADMIN = "admin"
 
 # Association table for friends
 user_friends = Table(
@@ -44,6 +48,9 @@ class User(Base):
     subscription_plan = Column(String, default="Free")
     setup_step = Column(Enum(SetupStep), default=SetupStep.email_verification)
     joined_at = Column(DateTime, default=datetime.utcnow)
+    user_type = Column(Enum(UserType), default=UserType.REGULAR, nullable=False)
+    admin_secret_key = Column(String, nullable=True)
+    flagged_for_review = Column(Boolean, default=False)
 
     # New fields
     age = Column(Integer, nullable=True)
@@ -63,6 +70,11 @@ class User(Base):
     accepted_privacy_policy = Column(Boolean, nullable=False)
     accepted_terms_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     accepted_privacy_policy_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    #MFA
+    mfa_enabled = Column(Boolean, default=False)
+    mfa_secret = Column(String, nullable=True)
+    mfa_backup_codes = Column(ARRAY(String), nullable=True)
 
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
 

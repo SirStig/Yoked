@@ -160,20 +160,77 @@ const ContinueButton = styled.button`
   }
 `;
 
+const Overlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+`;
+
+const Modal = styled.div`
+  background: ${({ theme }) => theme.colors.cardBackground};
+  padding: 2rem;
+  border-radius: ${({ theme }) => theme.borderRadius};
+  box-shadow: ${({ theme }) => theme.shadows.large};
+  max-width: 500px;
+  text-align: center;
+  animation: ${fadeIn} 0.3s ease-in-out;
+
+  h2 {
+    margin-bottom: 1rem;
+    color: ${({ theme }) => theme.colors.textPrimary};
+  }
+
+  p {
+    margin-bottom: 2rem;
+    color: ${({ theme }) => theme.colors.textSecondary};
+  }
+
+  button {
+    margin: 0 0.5rem;
+    padding: 0.5rem 1.5rem;
+    background-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.textPrimary};
+    border: none;
+    border-radius: ${({ theme }) => theme.borderRadius};
+    font-weight: bold;
+    cursor: pointer;
+
+    &:hover {
+      background-color: ${({ theme }) => theme.colors.primaryHover};
+    }
+  }
+`;
+
 const SubscriptionSelection = () => {
   const { currentUser, loadUser } = useContext(AuthContext);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [subscriptionTiers, setSubscriptionTiers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
+    const reloadUser = async () => {
+      try {
+        await loadUser();
+      } catch (error) {
+        toast.error("Failed to reload user data.");
+      }
+    };
+    reloadUser();
+
     if (!currentUser) {
       navigate("/login");
       return;
     }
 
-    // Handle redirection based on updated setup steps
     if (currentUser.setup_step === "profile_completion") {
       navigate("/profile-setup");
     } else if (currentUser.setup_step === "subscription_selection") {
@@ -183,7 +240,7 @@ const SubscriptionSelection = () => {
     } else {
       navigate("/verify-email");
     }
-  }, [currentUser, navigate]);
+  }, [currentUser, navigate, loadUser]);
 
   useEffect(() => {
     const storedPlan = sessionStorage.getItem("selectedPlan");
@@ -217,6 +274,9 @@ const SubscriptionSelection = () => {
 
   const handleSelectPlan = (plan) => {
     setSelectedPlan(plan);
+    if (plan.price === 0) {
+      setShowOverlay(true);
+    }
   };
 
   const handleContinue = async () => {
@@ -228,7 +288,7 @@ const SubscriptionSelection = () => {
     setIsLoading(true);
 
     try {
-      if (selectedPlan.price === "0") {
+      if (selectedPlan.price === 0) {
         await subscribeFreeTier();
         toast.success("You have successfully subscribed to the Free plan.");
         navigate("/dashboard");
@@ -248,6 +308,10 @@ const SubscriptionSelection = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const closeOverlay = () => {
+    setShowOverlay(false);
   };
 
   return (
@@ -280,6 +344,17 @@ const SubscriptionSelection = () => {
       <ContinueButton onClick={handleContinue} disabled={isLoading}>
         {isLoading ? "Processing..." : "Continue to Payment"}
       </ContinueButton>
+
+      {showOverlay && (
+        <Overlay>
+          <Modal>
+            <h2>Subscribe to the Free Plan</h2>
+            <p>Are you sure you'd like to subscribe to the Free Plan? Consider exploring our paid tiers for more benefits!</p>
+            <button onClick={closeOverlay}>Cancel</button>
+            <button onClick={handleContinue}>Confirm</button>
+          </Modal>
+        </Overlay>
+      )}
     </Container>
   );
 };

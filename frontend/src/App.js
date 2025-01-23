@@ -14,6 +14,10 @@ import Dashboard from "./pages/Dashboard";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancel from "./pages/PaymentCancel";
 import NotFound from "./pages/NotFound";
+import PrivateRoute from "./utils/PrivateRoute";
+import AdminApp from "./admin/AdminApp";
+import AdminLogin from "./admin/users/AdminLogin";
+import AdminRegistration from "./admin/users/AdminRegistration";
 
 // ProtectedRoute for pages that need login and valid setup step
 const ProtectedRoute = ({ children, requiredSetupStep, allowOnCompleted = false }) => {
@@ -163,6 +167,19 @@ const App = () => {
             <ProtectedRoute requiredSetupStep="completed">
               <Dashboard />
             </ProtectedRoute>
+          }
+        />
+
+        {/* Non-Protected Admin Routes */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/register" element={<AdminRegistration />} />
+        {/* Protected Admin Routes */}
+        <Route
+          path="/admin/*"
+          element={
+            <PrivateRoute>
+              <AdminApp />
+            </PrivateRoute>
           }
         />
        {/* Catch-all route */}

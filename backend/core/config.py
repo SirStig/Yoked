@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # OAuth2 settings
     oauth2_scheme: ClassVar[OAuth2PasswordBearer] = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
+    ### ADMIN ###
+    ADMIN_WHITELISTED_IPS: str = os.getenv("WHITELISTED_IPS", "127.0.0.1")
+    SUPERUSER_CREATION_SECRET_KEY: str = os.getenv("SUPERUSER_CREATION_SECRET_KEY", "your_superuser_secret_key")
+
     class Config:
         env_file = BACKEND_ENV_PATH
 

@@ -5,6 +5,8 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.api.middlewares.admin_middleware import AdminValidationMiddleware
+from backend.api.middlewares.mfa_middleware import MFAMiddleware
 from backend.api.payments.webhooks.stripe_webhook import stripe_webhook
 from backend.core.config import settings
 from backend.api.auth.auth_routes import router as auth_router
@@ -13,10 +15,13 @@ from backend.api.payments.payment_routes import router as payment_router
 from backend.api.workouts.workout_routes import router as workout_router
 from backend.api.payments.webhooks.stripe_webhook import router as stripe_webhook
 from backend.api.subscriptions.subscription_routes import router as subscription_router
+from backend.api.admin.admin_routes import router as admin_router
 from backend.api.middlewares.session_middleware import SessionValidationMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
-from backend.core.database import init_db, get_db
+from backend.core.database import init_db, get_db, engine
 from backend.core.logging_config import get_logger
+from backend.tasks.celery_app import celery_app
+
 
 # Initialize logging
 logger = get_logger(__name__)
@@ -51,6 +56,10 @@ async def db_session_middleware(request: Request, call_next):
     response = await call_next(request)
     return response
 
+app.add_middleware(AdminValidationMiddleware)
+
+app.add_middleware(MFAMiddleware)
+
 # Configure CORS Middleware
 app.add_middleware(
     CORSMiddleware,
@@ -61,53 +70,6 @@ app.add_middleware(
 )
 
 logger.info(f"CORS middleware configured with origins: {allowed_origins}")
-
-# Celery processes
-celery_worker = None
-celery_beat = None
-
-def start_celery():
-    """
-    Start Celery worker and beat scheduler.
-    """
-    global celery_worker, celery_beat
-    try:
-        # Start Celery worker
-        celery_worker = subprocess.Popen(
-            ["celery", "-A", "backend.tasks.celery_app", "worker", "--loglevel=info"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        logger.info("Celery worker started.")
-
-        # Start Celery beat scheduler
-        celery_beat = subprocess.Popen(
-            ["celery", "-A", "backend.tasks.celery_app", "beat", "--loglevel=info"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        logger.info("Celery beat scheduler started.")
-    except Exception as e:
-        logger.error(f"Failed to start Celery: {e}")
-        raise
-
-def stop_celery():
-    """
-    Stop Celery worker and beat scheduler.
-    """
-    global celery_worker, celery_beat
-    try:
-        if celery_worker:
-            celery_worker.terminate()
-            celery_worker.wait()
-            logger.info("Celery worker stopped.")
-
-        if celery_beat:
-            celery_beat.terminate()
-            celery_beat.wait()
-            logger.info("Celery beat scheduler stopped.")
-    except Exception as e:
-        logger.error(f"Error stopping Celery: {e}")
 
 # Middleware: Session Validation
 try:
@@ -160,41 +122,126 @@ try:
 except Exception as e:
     logger.error(f"Failed to register Stripe Webhook router: {e}")
 
+try:
+    app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
+    logger.info("Admin router registered.")
+except Exception as e:
+    logger.error(f"Failed to register Admin router: {e}")
+
 # Startup Event
-@app.on_event("startup")
-def on_startup():
-    logger.info("Starting application initialization...")
+redis_server = None
+celery_worker = None
+celery_beat = None
+
+def start_redis():
+    """
+    Start the Redis server in the background.
+    """
+    global redis_server
     try:
-        init_db()
-        logger.info("Database initialized.")
+        redis_server = subprocess.Popen(
+            ["redis-server"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        logger.info("Redis server started.")
+    except Exception as e:
+        logger.error(f"Failed to start Redis server: {e}")
+        raise
+
+def stop_redis():
+    """
+    Stop the Redis server.
+    """
+    global redis_server
+    try:
+        if redis_server:
+            redis_server.terminate()
+            redis_server.wait()
+            logger.info("Redis server stopped.")
+    except Exception as e:
+        logger.error(f"Error stopping Redis server: {e}")
+
+def start_celery():
+    """
+    Start Celery worker and beat scheduler.
+    """
+    global celery_worker, celery_beat
+    try:
+        celery_worker = subprocess.Popen(
+            ["celery", "-A", "backend.tasks.celery_app", "worker", "--loglevel=info"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        celery_beat = subprocess.Popen(
+            ["celery", "-A", "backend.tasks.celery_app", "beat", "--loglevel=info"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        logger.info("Celery worker and beat scheduler started.")
+    except Exception as e:
+        logger.error(f"Failed to start Celery: {e}")
+        raise
+
+def stop_celery():
+    """
+    Stop Celery worker and beat scheduler.
+    """
+    global celery_worker, celery_beat
+    try:
+        if celery_worker:
+            celery_worker.terminate()
+            celery_worker.wait()
+            logger.info("Celery worker stopped.")
+
+        if celery_beat:
+            celery_beat.terminate()
+            celery_beat.wait()
+            logger.info("Celery beat scheduler stopped.")
+    except Exception as e:
+        logger.error(f"Error stopping Celery: {e}")
+
+# FastAPI startup event
+@app.on_event("startup")
+async def startup_event():
+    """
+    Perform startup operations.
+    """
+    logger.info("Starting application...")
+    try:
+        start_redis()
         start_celery()
     except Exception as e:
-        logger.critical(f"Startup failure: {e}")
-        raise RuntimeError("Application startup failed.")
+        logger.critical(f"Error during startup: {e}")
+        raise
 
-# Shutdown Event
+# FastAPI shutdown event
 @app.on_event("shutdown")
-def on_shutdown():
+async def shutdown_event():
+    """
+    Perform cleanup operations.
+    """
     logger.info("Shutting down application...")
-    stop_celery()
+    try:
+        stop_redis()
+        stop_celery()
+        engine.dispose()
+        logger.info("Clean shutdown completed.")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
 
-# Health Check
+# Health Check Endpoint
 @app.get("/health", tags=["System"])
 def health_check():
-    logger.debug("Health check endpoint accessed.")
     return {"status": "ok", "environment": settings.ENV}
 
-# Run server
 if __name__ == "__main__":
     logger.info("Starting Uvicorn server...")
-    try:
-        uvicorn.run(
-            "backend.main:app",
-            host=settings.HOST,
-            port=8000,
-            reload=settings.DEBUG,
-            ssl_keyfile=settings.SSL_KEYFILE if not settings.DEBUG else None,
-            ssl_certfile=settings.SSL_CERTFILE if not settings.DEBUG else None,
-        )
-    except Exception as e:
-        logger.critical(f"Failed to start Uvicorn server: {e}")
+    uvicorn.run(
+        "backend.main:app",
+        host=settings.HOST,
+        port=8000,
+        reload=settings.DEBUG,
+        ssl_keyfile=settings.SSL_KEYFILE if not settings.DEBUG else None,
+        ssl_certfile=settings.SSL_CERTFILE if not settings.DEBUG else None,
+    )

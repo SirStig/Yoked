@@ -13,7 +13,7 @@ from backend.services.session_service import (
     invalidate_specific_session,
 )
 from backend.core.config import settings
-from backend.schemas.user_schema import UserCreate
+from backend.schemas.user_schema import UserCreate, UserType, SetupStep
 
 logger = get_logger(__name__)
 
@@ -76,7 +76,12 @@ def create_user(db: Session, user: UserCreate) -> User:
         if get_user_by_email(db, user.email):
             raise HTTPException(status_code=400, detail={"code": "email_exists", "detail": "Email already registered"})
 
-        hashed_password = hash_password(user.password)
+        hashed_password = hash_password(user.hashed_password)
+
+        # Exclude admin_secret_key for regular users
+        if user.user_type == UserType.ADMIN and not user.admin_secret_key:
+            raise HTTPException(status_code=403, detail="Admin secret key is required for admin users")
+
         new_user = User(
             full_name=user.full_name,
             username=user.username,
@@ -95,7 +100,9 @@ def create_user(db: Session, user: UserCreate) -> User:
             accepted_terms_at=datetime.utcnow(),
             accepted_privacy_policy_at=datetime.utcnow(),
             profile_version=1,
+            admin_secret_key="",
         )
+
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
@@ -106,6 +113,7 @@ def create_user(db: Session, user: UserCreate) -> User:
     except Exception as e:
         logger.exception("Error creating user")
         raise HTTPException(status_code=500, detail="User creation failed")
+
 
 
 def authenticate_user(username: str, password: str, db: Session) -> User:
@@ -157,9 +165,10 @@ def admin_required(
 ) -> User:
     if not current_user.is_active:
         raise HTTPException(status_code=403, detail="Inactive user")
-    if not current_user.is_admin:
+    if current_user.user_type != UserType.ADMIN:
         raise HTTPException(status_code=403, detail="Admin privileges required")
     return current_user
+
 
 
 def logout_user(token: str, db: Session):

@@ -101,7 +101,7 @@ const Verification = () => {
 
   const handleNextStep = () => {
     if (status === "success") {
-      navigate("/profile-completion");
+      navigate("/profile-setup");
     } else {
       toast.error("Please verify your email before proceeding.");
     }
