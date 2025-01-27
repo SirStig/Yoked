@@ -1,5 +1,6 @@
 import axios from "axios";
 import { toast } from "react-toastify";
+import {getProfileVersion} from "./userApi";
 
 // Axios instance for centralized configuration
 const apiClient = axios.create({
@@ -104,18 +105,3 @@ export const logoutUser = async () => {
   }
 };
 
-// API: Get Profile Version
-export const getProfileVersion = async () => {
-  try {
-    const response = await apiClient.get("/profile/version");
-    const version = response.data.version;
-
-    // Cache the version in localStorage
-    cachedProfileVersion = version;
-    localStorage.setItem("profileVersion", version.toString());
-
-    return version;
-  } catch (error) {
-    return handleError(error);
-  }
-};

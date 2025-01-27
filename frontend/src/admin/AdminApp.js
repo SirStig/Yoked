@@ -1,42 +1,80 @@
 import React from "react";
 import { Admin, Resource, CustomRoutes } from "react-admin";
-import {HashRouter, Route} from "react-router-dom";
+import { Route } from "react-router-dom";
 import authProvider from "./authProvider";
 import dataProvider from "./dataProvider";
-import customRoutes from "./customRoutes";
 import AdminDashboard from "./dashboard/AdminDashboard";
-import ManageUsers from "./users/ManageUsers";
+import ManageUsers from "./users/ManageUsers"; // Import your components
 import ManageSubscriptions from "./subscriptions/ManageSubscriptions";
-import ManageContent from "./content/ManageContent";
 import ManagePayments from "./payments/ManagePayments";
+import ManageContent from "./content/ManageContent";
+import AdminEmail from "./emails/AdminEmail";
 import AdminReports from "./reports/AdminReports";
-import ModerateCommunity from "./community/ModerateCommunity";
+import AdminSettings from "./settings/AdminSettings";
+import AdminSupport from "./support/AdminSupport";
+import CustomAdminLayout from "./customAdminLayout";
+import { ThemeProvider } from "styled-components";
+import { adminTheme } from "./styles/adminTheme";
+import AdminGlobalStyles from "./styles/adminStyles";
 
-// Admin App Component
 const AdminApp = () => {
   return (
-    <HashRouter>
-        <Admin
-          dashboard={AdminDashboard}
-          dataProvider={dataProvider}
-          authProvider={authProvider}
-          customRoutes={
-            <CustomRoutes>
-              {customRoutes.map((route) => (
-                <Route key={route.key} path={route.path} element={route.element} />
-              ))}
-            </CustomRoutes>
-          }
-        >
-          {/* Define resources for React Admin */}
-          <Resource name="users" options={{ label: "Users" }} />
-          <Resource name="subscriptions" options={{ label: "Subscriptions" }} />
-          <Resource name="content" options={{ label: "Content" }} />
-          <Resource name="payments" options={{ label: "Payments" }} />
-          <Resource name="reports" options={{ label: "Reports" }} />
-          <Resource name="community" options={{ label: "Community" }} />
-        </Admin>
-    </HashRouter>
+    <ThemeProvider theme={adminTheme}>
+      <AdminGlobalStyles />
+      <Admin
+        dashboard={AdminDashboard}
+        dataProvider={dataProvider}
+        authProvider={authProvider}
+        layout={CustomAdminLayout}
+      >
+        {/* Resources for React-Admin */}
+        <Resource
+          name="users"
+          list={ManageUsers}
+          options={{ label: "Manage Users" }}
+        />
+        <Resource
+          name="subscriptions"
+          list={ManageSubscriptions}
+          options={{ label: "Manage Subscriptions" }}
+        />
+        <Resource
+          name="payments"
+          list={ManagePayments}
+          options={{ label: "Manage Payments" }}
+        />
+        <Resource
+          name="reports"
+          list={AdminReports}
+          options={{ label: "Reports" }}
+        />
+        <Resource
+          name="content"
+          list={ManageContent}
+          options={{ label: "Manage Content" }}
+        />
+        <Resource
+          name="emails"
+          list={AdminEmail}
+          options={{ label: "Manage Emails" }}
+        />
+        <Resource
+          name="settings"
+          list={AdminSettings}
+          options={{ label: "Admin Settings" }}
+        />
+        <Resource
+          name="support"
+          list={AdminSupport}
+          options={{ label: "Manage User Support" }}
+        />
+        {/* Custom Routes */}
+        <CustomRoutes>
+          <Route path="/custom-settings" element={<div>Settings Page</div>} />
+          {/* Add additional custom routes if needed */}
+        </CustomRoutes>
+      </Admin>
+    </ThemeProvider>
   );
 };
 

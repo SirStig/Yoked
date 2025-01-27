@@ -6,113 +6,29 @@ import { useNavigate } from "react-router-dom";
 import { updateProfile } from "../../api/userApi";
 
 // Styled Components
-const Container = styled.div`
+const OverlayContent = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+  padding: 2rem;
+
   width: 100%;
-  background-color: ${({ theme }) => theme.colors.secondary};
-  color: ${({ theme }) => theme.colors.textPrimary};
-  position: relative;
-  overflow: hidden;
-`;
-
-const BackgroundImage = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: url("https://images.pexels.com/photos/6389886/pexels-photo-6389886.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2")
-    no-repeat center center/cover;
-  z-index: 0;
-
-  &::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-  }
-`;
-
-const Header = styled.div`
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  display: flex;
-  gap: 1rem;
-  z-index: 2;
-
-  button {
-    background: transparent;
-    border: none;
-    color: ${({ theme }) => theme.colors.primary};
-    font-size: 1.5rem;
-    cursor: pointer;
-
-    &:hover {
-      color: ${({ theme }) => theme.colors.primaryHover};
-    }
-  }
-`;
-
-const CardWrapper = styled.div`
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 70%;
-  width: 100%;
-  padding: 1rem;
-  z-index: 1;
+  max-width: 500px;
+  text-align: center;
 `;
 
 const Card = styled.div`
-  position: absolute;
-  width: 80%;
-  max-width: 500px;
-  padding: 2rem;
-  border-radius: ${({ theme }) => theme.borderRadius};
-  background-color: ${({ theme }) => theme.colors.cardBackground};
-  box-shadow: ${({ theme }) => theme.shadows.medium};
+  width: 100%;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
   text-align: center;
-  animation: ${(props) => (props.isEntering ? "fadeIn" : "fadeOut")} 0.5s ease-in-out forwards;
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translate3d(100%, 0, 0);
-    }
-    to {
-      opacity: 1;
-      transform: translate3d(0, 0, 0);
-    }
-  }
-
-  @keyframes fadeOut {
-    from {
-      opacity: 1;
-      transform: translate3d(0, 0, 0);
-    }
-    to {
-      opacity: 0;
-      transform: translate3d(-100%, 0, 0);
-    }
-  }
 `;
 
 const Input = styled.input`
-  width: 90%;
+  width: 100%;
   padding: 1rem;
   border: 1px solid ${({ theme }) => theme.colors.inputBorder};
   border-radius: ${({ theme }) => theme.borderRadius};
@@ -122,7 +38,7 @@ const Input = styled.input`
 `;
 
 const Dropdown = styled.select`
-  width: 90%;
+  width: 100%;
   padding: 1rem;
   border: 1px solid ${({ theme }) => theme.colors.inputBorder};
   border-radius: ${({ theme }) => theme.borderRadius};
@@ -134,6 +50,7 @@ const Dropdown = styled.select`
 const ButtonContainer = styled.div`
   display: flex;
   gap: 1rem;
+  justify-content: center;
   margin-top: 1rem;
 `;
 
@@ -212,7 +129,7 @@ const ProfileCompletion = () => {
       });
       await loadUser();
       toast.success("Profile updated successfully!");
-      navigate("/choose-subscription");
+      navigate("/dashboard", { state: { overlay: "subscriptionSelection" } });
     } catch (error) {
       toast.error(error.message || "Failed to update profile.");
     }
@@ -338,31 +255,24 @@ const ProfileCompletion = () => {
   ];
 
   return (
-    <Container>
-      <BackgroundImage />
-      <Header>
-        <button onClick={() => navigate("/")}>← Home</button>
-        <button onClick={handleLogout}>Logout</button>
-      </Header>
-      <CardWrapper>
-        {cards.map((card, index) =>
-          index === activeIndex ? (
-            <Card key={index} isEntering>
-              <h2>{card.title}</h2>
-              {card.content}
-              <ButtonContainer>
-                {index > 0 && <Button onClick={handleBack}>Back</Button>}
-                <Button
-                  onClick={index === cards.length - 1 ? handleSubmit : handleNext}
-                >
-                  {index === cards.length - 1 ? "Finish" : "Continue"}
-                </Button>
-              </ButtonContainer>
-            </Card>
-          ) : null
-        )}
-      </CardWrapper>
-    </Container>
+    <OverlayContent>
+      {cards.map((card, index) =>
+        index === activeIndex ? (
+          <Card key={index}>
+            <h2>{card.title}</h2>
+            {card.content}
+            <ButtonContainer>
+              {index > 0 && <Button onClick={handleBack}>Back</Button>}
+              <Button
+                onClick={index === cards.length - 1 ? handleSubmit : handleNext}
+              >
+                {index === cards.length - 1 ? "Finish" : "Continue"}
+              </Button>
+            </ButtonContainer>
+          </Card>
+        ) : null
+      )}
+    </OverlayContent>
   );
 };
 

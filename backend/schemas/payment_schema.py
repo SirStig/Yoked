@@ -101,7 +101,6 @@ class SubscriptionTierOut(BaseModel):
         orm_mode = True
 
 
-
 # Payment Create Schema
 class PaymentCreate(BaseModel):
     user_id: Optional[UUID] = Field(None, description="The UUID of the user making the payment")
@@ -162,6 +161,27 @@ class AdminPaymentHistory(BaseModel):
     user_email: str = Field(..., description="Email of the user")
     payments: List[PaymentOut] = Field(..., description="List of payments made by the user")
     total_amount_spent: Optional[int] = Field(0, description="Total amount spent by the user in cents")
+
+    class Config:
+        orm_mode = True
+
+
+# Subscription Details Schema
+class SubscriptionDetails(BaseModel):
+    subscription_name: str = Field(..., description="Name of the subscription tier")
+    price: int = Field(..., description="Price in cents for the subscription")
+    currency: str = Field(..., description="Currency of the subscription")
+    status: str = Field(..., description="Current status of the subscription")
+    renewal_date: Optional[datetime] = Field(None, description="Next renewal date of the subscription")
+
+    class Config:
+        orm_mode = True
+
+
+# Update Subscription Schema
+class UpdateSubscription(BaseModel):
+    subscription_tier_id: UUID = Field(..., description="ID of the new subscription tier")
+    payment_method: Optional[str] = Field(None, description="Preferred payment method for subscription")
 
     class Config:
         orm_mode = True

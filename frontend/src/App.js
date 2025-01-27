@@ -1,77 +1,28 @@
-import React, { useContext, useEffect } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import React, { useContext } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "styled-components";
 import GlobalStyles from "./styles/globalStyles";
 import { theme } from "./styles/theme";
 import { AuthContext } from "./contexts/AuthContext";
 import Home from "./pages/Home";
-import Login from "./pages/Login";
-import AccountCreation from "./pages/Registration/AccountCreation";
-import Verification from "./pages/Verification";
-import ProfileCompletion from "./pages/Registration/ProfileCompletion";
-import SubscriptionSelection from "./pages/Registration/SubscriptionSelection";
 import Dashboard from "./pages/Dashboard";
+import Verification from "./pages/Verification";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancel from "./pages/PaymentCancel";
 import NotFound from "./pages/NotFound";
-import PrivateRoute from "./utils/PrivateRoute";
-import AdminApp from "./admin/AdminApp";
-import AdminLogin from "./admin/users/AdminLogin";
-import AdminRegistration from "./admin/users/AdminRegistration";
+import Privacy from "./pages/legal/privacy";
+import TermsConditions from "./pages/legal/terms_and_conditions";
 
-// ProtectedRoute for pages that need login and valid setup step
-const ProtectedRoute = ({ children, requiredSetupStep, allowOnCompleted = false }) => {
-  const { currentUser, loading, loadUser } = useContext(AuthContext);
-  const location = useLocation();
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!loading && !currentUser) {
-        await loadUser(); // Ensure user data is loaded
-      }
-    };
-    fetchUserData();
-  }, [loading, currentUser, loadUser]);
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+// ProtectedRoute for pages that require specific setup steps
+const ProtectedRoute = ({ children, requiredSetupStep }) => {
+  const { currentUser } = useContext(AuthContext);
 
   if (!currentUser) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
-  const currentPath = location.pathname;
-
-  // Mapping setup_step to the corresponding paths
-  const setupStepToPath = {
-    "verify_email": "/verify-email",
-    "profile_completion": "/profile-setup",
-    "subscription_selection": "/choose-subscription",
-    "completed": "/dashboard"
-  };
-
-  const nextStepPath = setupStepToPath[currentUser.setup_step] || "/dashboard";
-
-  if (currentUser.setup_step !== requiredSetupStep && currentPath !== nextStepPath) {
-    return <Navigate to={nextStepPath} replace />;
-  }
-
-  if (allowOnCompleted && currentUser.setup_step === "completed") {
-    return children;
-  }
-
-  return children;
-};
-
-// GuestRoute for pages accessible by anyone (logged in or not)
-const GuestRoute = ({ children, allowLoggedInHome = false }) => {
-  const { currentUser, loading } = useContext(AuthContext);
-
-  if (loading) return <div>Loading...</div>;
-
-  if (currentUser) {
-    return allowLoggedInHome ? children : <Navigate to="/dashboard" replace />;
+  if (currentUser.setup_step !== requiredSetupStep && requiredSetupStep) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -82,41 +33,18 @@ const App = () => {
     <ThemeProvider theme={theme}>
       <GlobalStyles />
       <Routes>
-        {/* Guest Routes */}
+        {/* Public Route */}
+        <Route path="/" element={<Home />} />
+        <Route path="/legal/privacy" element={<Privacy />} />
+        <Route path="/legal/terms" element={<TermsConditions />} />
+
+        {/* Dashboard Route */}
         <Route
-          path="/"
-          element={
-            <GuestRoute allowLoggedInHome>
-              <Home />
-            </GuestRoute>
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            <GuestRoute>
-              <Login />
-            </GuestRoute>
-          }
-        />
-        <Route
-          path="/register"
-          element={
-            <GuestRoute>
-              <AccountCreation />
-            </GuestRoute>
-          }
-        />
-        <Route
-          path="/payment-cancel"
-          element={
-            <GuestRoute>
-              <PaymentCancel />
-            </GuestRoute>
-          }
+          path="/dashboard"
+          element={<Dashboard />}
         />
 
-        {/* Setup Steps */}
+        {/* Email Verification */}
         <Route
           path="/verify-email"
           element={
@@ -125,66 +53,14 @@ const App = () => {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/profile-setup"
-          element={
-            <ProtectedRoute requiredSetupStep="profile_completion">
-              <ProfileCompletion />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/choose-subscription"
-          element={
-            <ProtectedRoute requiredSetupStep="subscription_selection">
-              <SubscriptionSelection />
-            </ProtectedRoute>
-          }
-        />
 
-        {/* Payment Success & Cancel */}
-        <Route
-          path="/payment-success"
-          element={
-            <ProtectedRoute requiredSetupStep="subscription_selection" allowOnCompleted>
-              <PaymentSuccess />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/payment-cancel"
-          element={
-            <ProtectedRoute requiredSetupStep="subscription_selection" allowOnCompleted>
-              <PaymentCancel />
-            </ProtectedRoute>
-          }
-        />
+        {/* Payment Routes */}
+        <Route path="/payment-success" element={<PaymentSuccess />} />
+        <Route path="/payment-cancel" element={<PaymentCancel />} />
 
-        {/* Main Application */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute requiredSetupStep="completed">
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Non-Protected Admin Routes */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/register" element={<AdminRegistration />} />
-        {/* Protected Admin Routes */}
-        <Route
-          path="/admin/*"
-          element={
-            <PrivateRoute>
-              <AdminApp />
-            </PrivateRoute>
-          }
-        />
-       {/* Catch-all route */}
+        {/* Fallback Route */}
         <Route path="*" element={<NotFound />} />
-        </Routes>
+      </Routes>
     </ThemeProvider>
   );
 };

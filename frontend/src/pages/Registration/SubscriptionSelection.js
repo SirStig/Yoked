@@ -5,7 +5,6 @@ import styled, { keyframes } from "styled-components";
 import { toast } from "react-toastify";
 import { createStripePayment, subscribeFreeTier } from "../../api/paymentApi";
 import { getAllSubscriptions } from "../../api/subscriptionApi";
-import { logoutUser } from "../../api/authApi";
 
 // Styled Components
 const fadeIn = keyframes`
@@ -19,89 +18,60 @@ const fadeIn = keyframes`
   }
 `;
 
-const Container = styled.div`
-  position: relative;
-  min-height: 100vh;
+const OverlayContent = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
+  max-height: 90vh;
+  width: 95%;
+  max-width: 1200px;
   padding: 2rem;
-  overflow: hidden;
-`;
+  overflow-y: auto;
+  text-align: center;
 
-const BackgroundImage = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: url("https://images.pexels.com/photos/1552252/pexels-photo-1552252.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2")
-    no-repeat center center/cover;
-  z-index: 0;
-
-  &::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
+  @media (max-width: 768px) {
+    padding: 1.5rem;
+    max-height: 85vh;
   }
-`;
 
-const Header = styled.div`
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  display: flex;
-  gap: 1rem;
-  z-index: 2;
-
-  button {
-    background: transparent;
-    border: none;
-    color: ${({ theme }) => theme.colors.primary};
-    font-size: 1.5rem;
-    cursor: pointer;
-
-    &:hover {
-      color: ${({ theme }) => theme.colors.primaryHover};
-    }
+  @media (max-width: 480px) {
+    padding: 1rem;
   }
 `;
 
 const Title = styled.h1`
-  font-size: 2.5rem;
+  font-size: 2rem;
   color: ${({ theme }) => theme.colors.textPrimary};
-  margin-bottom: 2rem;
-  z-index: 2;
+  margin-bottom: 1.5rem;
   animation: ${fadeIn} 0.6s ease-in-out;
+
+  @media (max-width: 768px) {
+    font-size: 1.8rem;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 1.5rem;
+  }
 `;
 
 const PlansContainer = styled.div`
   display: flex;
   justify-content: center;
-  gap: 2rem;
-  z-index: 2;
+  gap: 1rem;
   max-width: 100%;
   flex-wrap: wrap;
-  margin: 0 auto;
-  padding: 0 1rem;
+
+  @media (max-width: 768px) {
+    gap: 0.5rem;
+  }
 `;
 
 const PlanCard = styled.div`
-  background: ${({ theme }) => theme.colors.cardBackground};
   padding: 2rem;
-  border-radius: ${({ theme }) => theme.borderRadius};
-  box-shadow: ${({ theme }) => theme.shadows.medium};
   text-align: center;
-  flex: 1 1 calc(33.33% - 2rem);
+  flex: 1 1 calc(33.33% - 1rem);
   max-width: 300px;
-  margin: 0 auto;
-  position: relative;
   cursor: pointer;
   transition: transform 0.3s, box-shadow 0.3s;
 
@@ -116,24 +86,48 @@ const PlanCard = styled.div`
   }
 
   h3 {
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     color: ${({ theme }) => theme.colors.primary};
+
+    @media (max-width: 768px) {
+      font-size: 1.3rem;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 1.2rem;
+    }
   }
 
   ul {
     list-style: none;
     padding: 0;
     margin: 1rem 0;
-    text-align: left;
 
     li {
-      margin-bottom: 0.5rem;
+      font-size: 1rem;
+      color: ${({ theme }) => theme.colors.textSecondary};
+
+      @media (max-width: 768px) {
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 480px) {
+        font-size: 0.8rem;
+      }
     }
   }
 
   p {
-    font-size: 1.2rem;
+    font-size: 1rem;
     color: ${({ theme }) => theme.colors.textSecondary};
+
+    @media (max-width: 768px) {
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 0.8rem;
+    }
   }
 `;
 
@@ -147,7 +141,6 @@ const ContinueButton = styled.button`
   font-size: 1.2rem;
   font-weight: bold;
   cursor: pointer;
-  z-index: 2;
   transition: background-color 0.3s;
 
   &:hover {
@@ -158,53 +151,15 @@ const ContinueButton = styled.button`
     background-color: ${({ theme }) => theme.colors.disabled};
     cursor: not-allowed;
   }
-`;
 
-const Overlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 999;
-`;
-
-const Modal = styled.div`
-  background: ${({ theme }) => theme.colors.cardBackground};
-  padding: 2rem;
-  border-radius: ${({ theme }) => theme.borderRadius};
-  box-shadow: ${({ theme }) => theme.shadows.large};
-  max-width: 500px;
-  text-align: center;
-  animation: ${fadeIn} 0.3s ease-in-out;
-
-  h2 {
-    margin-bottom: 1rem;
-    color: ${({ theme }) => theme.colors.textPrimary};
+  @media (max-width: 768px) {
+    padding: 0.8rem 1.5rem;
+    font-size: 1rem;
   }
 
-  p {
-    margin-bottom: 2rem;
-    color: ${({ theme }) => theme.colors.textSecondary};
-  }
-
-  button {
-    margin: 0 0.5rem;
-    padding: 0.5rem 1.5rem;
-    background-color: ${({ theme }) => theme.colors.primary};
-    color: ${({ theme }) => theme.colors.textPrimary};
-    border: none;
-    border-radius: ${({ theme }) => theme.borderRadius};
-    font-weight: bold;
-    cursor: pointer;
-
-    &:hover {
-      background-color: ${({ theme }) => theme.colors.primaryHover};
-    }
+  @media (max-width: 480px) {
+    padding: 0.7rem 1.2rem;
+    font-size: 0.9rem;
   }
 `;
 
@@ -213,41 +168,22 @@ const SubscriptionSelection = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [subscriptionTiers, setSubscriptionTiers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showOverlay, setShowOverlay] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const reloadUser = async () => {
-      try {
-        await loadUser();
-      } catch (error) {
-        toast.error("Failed to reload user data.");
-      }
-    };
-    reloadUser();
-
     if (!currentUser) {
       navigate("/login");
       return;
     }
 
     if (currentUser.setup_step === "profile_completion") {
-      navigate("/profile-setup");
+      navigate("/dashboard", { state: { overlay: "profileCompletion" } });
     } else if (currentUser.setup_step === "subscription_selection") {
-      // Allow to stay on the subscription selection page
+      // Stay on this overlay
     } else if (currentUser.setup_step === "completed") {
       navigate("/dashboard");
     } else {
       navigate("/verify-email");
-    }
-  }, [currentUser, navigate, loadUser]);
-
-  useEffect(() => {
-    const storedPlan = sessionStorage.getItem("selectedPlan");
-
-    if (storedPlan) {
-      setSelectedPlan(JSON.parse(storedPlan));
-      sessionStorage.removeItem("selectedPlan");
     }
 
     const fetchTiers = async () => {
@@ -260,23 +196,10 @@ const SubscriptionSelection = () => {
     };
 
     fetchTiers();
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      await logoutUser();
-      toast.success("Successfully logged out.");
-      navigate("/login");
-    } catch (error) {
-      toast.error(error.message || "Failed to log out.");
-    }
-  };
+  }, [currentUser, navigate]);
 
   const handleSelectPlan = (plan) => {
     setSelectedPlan(plan);
-    if (plan.price === 0) {
-      setShowOverlay(true);
-    }
   };
 
   const handleContinue = async () => {
@@ -296,7 +219,7 @@ const SubscriptionSelection = () => {
         const payment = await createStripePayment(selectedPlan.id);
 
         if (payment.url) {
-          sessionStorage.setItem("returnPath", "/choose-subscription");
+          sessionStorage.setItem("returnPath", "/dashboard");
           sessionStorage.setItem("selectedPlan", JSON.stringify(selectedPlan));
           window.location.href = payment.url;
         } else {
@@ -310,17 +233,8 @@ const SubscriptionSelection = () => {
     }
   };
 
-  const closeOverlay = () => {
-    setShowOverlay(false);
-  };
-
   return (
-    <Container>
-      <BackgroundImage />
-      <Header>
-        <button onClick={() => navigate("/")}>← Home</button>
-        <button onClick={handleLogout}>Logout</button>
-      </Header>
+    <OverlayContent>
       <Title>Choose Your Plan</Title>
       <PlansContainer>
         {subscriptionTiers.map((tier) => (
@@ -344,18 +258,7 @@ const SubscriptionSelection = () => {
       <ContinueButton onClick={handleContinue} disabled={isLoading}>
         {isLoading ? "Processing..." : "Continue to Payment"}
       </ContinueButton>
-
-      {showOverlay && (
-        <Overlay>
-          <Modal>
-            <h2>Subscribe to the Free Plan</h2>
-            <p>Are you sure you'd like to subscribe to the Free Plan? Consider exploring our paid tiers for more benefits!</p>
-            <button onClick={closeOverlay}>Cancel</button>
-            <button onClick={handleContinue}>Confirm</button>
-          </Modal>
-        </Overlay>
-      )}
-    </Container>
+    </OverlayContent>
   );
 };
 

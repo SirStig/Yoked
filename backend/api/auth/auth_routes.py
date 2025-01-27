@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.security import HTTPBearer
+from jinja2 import Template
 from jose import jwt, JWTError, ExpiredSignatureError
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -40,9 +41,12 @@ BASE_URL = settings.BASE_URL
 FRONTEND_BASE_URL = settings.FRONTEND_URL
 email_cooldown_cache = {}
 
-# Helper Function to Send Emails
-async def send_email(subject: str, recipient: str, body: str):
+async def send_email(subject: str, recipient: str, template: str, context: dict):
     try:
+        # Render the email body with Jinja2
+        template = Template(template)
+        body = template.render(context)
+
         message = MessageSchema(
             subject=subject,
             recipients=[recipient],
@@ -56,6 +60,75 @@ async def send_email(subject: str, recipient: str, body: str):
         logger.error(f"Failed to send email: {e}")
         raise HTTPException(status_code=500, detail="Failed to send email")
 
+# Email HTML Template
+email_template = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #007bff;
+            color: #ffffff;
+            text-align: center;
+            padding: 20px;
+        }
+        .content {
+            padding: 20px;
+            color: #333333;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .footer {
+            text-align: center;
+            padding: 10px;
+            background-color: #f4f4f4;
+            color: #777777;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>Welcome to Yoked!</h1>
+        </div>
+        <div class="content">
+            <p>Hi {{ username }},</p>
+            <p>Thank you for signing up for Yoked. Please verify your email address by clicking the button below:</p>
+            <a href="{{ verification_link }}" class="button">Verify Email</a>
+            <p>If you didn’t sign up for Yoked, you can safely ignore this email.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; {{ current_year }} Yoked. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
 
 # Route: Register user with email verification
 @router.post("/register", response_model=Token)
@@ -64,7 +137,6 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="You must accept terms and privacy policy")
 
     try:
-        # Check for existing username or email
         if get_user_by_username(db, user.username):
             raise HTTPException(status_code=400, detail="Username already registered")
         if get_user_by_email(db, user.email):
@@ -75,13 +147,18 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
         new_user.profile_version = 1
         db.commit()
 
-        # Generate and send verification email
         token_data = {"sub": str(new_user.id), "type": "email_verification"}
         verification_token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
         verification_link = f"{BASE_URL}/api/auth/verify-email?token={verification_token}"
-        await send_email("Verify Your Email", user.email, f"Click here to verify: {verification_link}")
 
-        # Create a session
+        context = {
+            "username": user.username,
+            "verification_link": verification_link,
+            "current_year": datetime.now().year,
+        }
+
+        await send_email("Verify Your Email", user.email, email_template, context)
+
         session_token = create_session(new_user.id, db)
         return {"access_token": session_token, "token_type": "bearer", "status": "pending"}
 
@@ -177,11 +254,15 @@ async def resend_verification_email(
     verification_token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
     verification_link = f"{BASE_URL}/api/auth/verify-email?token={verification_token}"
 
-    email_body = f"Click the link to verify your email: <a href='{verification_link}'>{verification_link}</a>"
-    await send_email("Verify Your Email", current_user.email, email_body)
+    context = {
+        "username": current_user.username,
+        "verification_link": verification_link,
+        "current_year": datetime.now().year,
+    }
+
+    await send_email("Verify Your Email", current_user.email, email_template, context)
     email_cooldown_cache[user_id] = now
     return {"message": "Verification email resent successfully"}
-
 
 # Route: Logout
 @router.post("/logout")

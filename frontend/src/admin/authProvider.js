@@ -1,7 +1,6 @@
 import axios from "axios";
 import { toast } from "react-toastify";
 
-// Configure API base URL and headers
 const API_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api";
 const apiClient = axios.create({
   baseURL: `${API_URL}/admin`,
@@ -11,131 +10,147 @@ const apiClient = axios.create({
   },
 });
 
-// Log initialization
-console.log(`Admin Auth API initialized at: ${apiClient.defaults.baseURL}`);
-
 // Attach admin token for authorization if available
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem("adminToken");
+  console.log("Authorization header token:", token); // Debug log
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-  } else {
-    console.warn("No admin token found.");
   }
   return config;
 });
 
-// Handle and normalize API errors
-const handleError = (error) => {
-  console.error("Admin API Error:", error);
-
-  if (error.response) {
-    const { status, data } = error.response;
-    console.error("Error Details:", data);
-
-    const detail = data?.detail || "An unexpected error occurred.";
-    toast.error(detail);
-
-    // Return structured error for further processing
-    return Promise.reject({ message: detail, status, data });
-  }
-
-  // Handle network or unknown errors
-  const networkError = { message: "Network error. Please try again later.", status: 0 };
-  toast.error(networkError.message);
-  return Promise.reject(networkError);
-};
-
 const authProvider = {
-  // Login: Authenticate admin users
-login: async ({ username, password }) => {
-  console.log("Admin login initiated...");
-  console.log("Payload received by authProvider:", { username, password });
+  // Admin login with MFA handling
+  login: async ({ username, password }) => {
+    console.log("Admin login initiated...");
+    try {
+      const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
-  try {
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+      // Send login request
+      const response = await apiClient.post("/login", {
+        email: username,
+        password,
+        is_mobile: isMobile,
+      });
 
-    const response = await apiClient.post("/login", {
-      email: username,
-      password,
-      is_mobile: isMobile,
-    });
+      console.log("Login response:", response.data); // Debug log
 
-    const { access_token } = response.data;
-    localStorage.setItem("adminToken", access_token);
+      const { mfa_required, mfa_setup_required, user_id, session_token } = response.data;
 
-    // Validate admin access
-    const userResponse = await apiClient.get("/profile", {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-
-    if (userResponse.data.user_type !== "ADMIN") {
-      localStorage.removeItem("adminToken");
-      toast.error("You do not have admin access.");
-      throw new Error("Insufficient permissions");
-    }
-
-    toast.success("Welcome to the Admin Panel!");
-    return Promise.resolve();
-  } catch (error) {
-    console.error("Login error:", error);
-    return handleError(error);
-  }
-},
-
-  // Register: Register a new admin user (requires a secret key)
-registerAdmin: async (userData) => {
-  try {
-    const secretKey = userData.admin_secret_key
-    const response = await apiClient.post(
-      "/create",
-      {
-        ...userData,
-      },
-      {
-        headers: {
-          "X-Superuser-Secret": secretKey,
-        },
+      if (mfa_setup_required) {
+        console.log("MFA setup required."); // Debug log
+        return Promise.resolve({
+          mfa_setup_required: true,
+          user_id,
+          session_token,
+        });
       }
-    );
 
-    console.log("Headers sent with request:", { "X-Superuser-Secret": secretKey });
-    toast.success("Admin account created successfully!");
-    return response.data;
-  } catch (error) {
-    return handleError(error);
-  }
-},
+      if (mfa_required) {
+        console.log("MFA verification required."); // Debug log
+        return Promise.resolve({
+          mfa_required: true,
+          user_id,
+          session_token,
+        });
+      }
+
+      if (!session_token) {
+        throw new Error("Login failed: No session token received.");
+      }
+
+      // Store token
+      localStorage.setItem("adminToken", session_token);
+      console.log("Admin token stored:", session_token); // Debug log
+      toast.success("Login successful!");
+      return Promise.resolve();
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error(error.response?.data?.detail || "Login failed.");
+      return Promise.reject(error);
+    }
+  },
+
+  // MFA Setup: Expect token upon successful setup
+  setupMFA: async ({ user_id, mfa_secret, totp_code }) => {
+    console.log("MFA setup initiated..."); // Debug log
+    try {
+      const response = await apiClient.post("/mfa/setup", {
+        user_id,
+        mfa_secret,
+        totp_code,
+      });
+
+      console.log("MFA setup response:", response.data); // Debug log
+
+      const { session_token } = response.data;
+
+      if (!session_token) {
+        throw new Error("MFA setup failed: No token returned.");
+      }
+
+      // Store the session token
+      localStorage.setItem("adminToken", session_token);
+      console.log("Admin token stored after MFA setup:", session_token); // Debug log
+      toast.success("MFA setup complete!");
+      return Promise.resolve();
+    } catch (error) {
+      console.error("MFA setup error:", error);
+      toast.error(error.response?.data?.detail || "MFA setup failed.");
+      return Promise.reject(error);
+    }
+  },
+
+  // MFA Verification: Expect token upon successful verification
+    verifyMFA: async ({ user_id, totp_code, session_token }) => {
+        console.log("MFA verification initiated..."); // Debug log
+        try {
+            const response = await apiClient.post("/mfa/verify", {
+                user_id,
+                totp_code,
+                session_token,
+            });
+
+            console.log("MFA verify response:", response.data); // Debug log
+
+            const { session_token: newSessionToken } = response.data;
+
+            if (!newSessionToken) {
+                throw new Error("MFA verification failed: No token returned.");
+            }
+
+            // Store the updated session token
+            localStorage.setItem("adminToken", newSessionToken);
+            console.log("Admin token stored after MFA verification:", newSessionToken); // Debug log
+            toast.success("MFA verified successfully!");
+            return Promise.resolve();
+        } catch (error) {
+            console.error("MFA verification error:", error);
+            toast.error(error.response?.data?.detail || "MFA verification failed.");
+            return Promise.reject(error);
+        }
+    },
 
 
   // Logout: Clear session and redirect
   logout: () => {
     console.log("Admin logout initiated...");
-    try {
-      localStorage.removeItem("adminToken");
-      toast.info("Logged out successfully.");
-      return Promise.resolve();
-    } catch (error) {
-      console.error("Error during logout:", error);
-      return Promise.reject("Logout failed.");
-    }
+    localStorage.removeItem("adminToken");
+    toast.info("Logged out successfully.");
+    return Promise.resolve();
   },
 
   // Ensure user is authenticated
   checkAuth: () => {
     const token = localStorage.getItem("adminToken");
-    if (token) {
-      console.log("Admin authentication verified.");
-      return Promise.resolve();
-    } else {
-      console.warn("Admin authentication failed.");
-      return Promise.reject({ message: "Not authenticated" });
-    }
+    console.log("AuthProvider checkAuth: token found?", !!token); // Debug log
+    return token ? Promise.resolve() : Promise.reject({ message: "Not authenticated" });
   },
 
   // Handle unauthorized or forbidden errors
   checkError: (error) => {
-    if (error.status === 401 || error.status === 403) {
+    if (error?.response?.status === 401 || error?.response?.status === 403) {
       console.warn("Admin authentication error. Clearing token...");
       localStorage.removeItem("adminToken");
       return Promise.reject();
@@ -146,15 +161,21 @@ registerAdmin: async (userData) => {
   // Get admin-specific permissions
   getPermissions: async () => {
     console.log("Fetching admin permissions...");
-    try {
-      const token = localStorage.getItem("adminToken");
-      if (!token) throw new Error("No admin token found.");
+    const token = localStorage.getItem("adminToken");
 
+    if (!token) {
+      console.warn("No admin token found.");
+      return Promise.reject("Unauthorized");
+    }
+
+    try {
       const response = await apiClient.get("/profile", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       const { user_type } = response.data;
+      console.log("User type fetched:", user_type);
+
       if (user_type === "admin") {
         console.log("Admin permissions granted.");
         return Promise.resolve("admin");
@@ -163,11 +184,17 @@ registerAdmin: async (userData) => {
         return Promise.reject("Unauthorized");
       }
     } catch (error) {
-      console.error("Error fetching permissions:", error);
-      localStorage.removeItem("adminToken");
+      console.error("Error fetching permissions:", error.response || error.message);
+      if (error.response?.status === 500) {
+        console.error("Server error on /profile. Possible backend issue.");
+      } else {
+        console.warn("Unauthorized session detected. Clearing admin token.");
+        localStorage.removeItem("adminToken");
+      }
       return Promise.reject("Unauthorized");
     }
   },
+
 };
 
 export default authProvider;

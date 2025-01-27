@@ -1,72 +1,50 @@
 import React from "react";
 import styled from "styled-components";
-import { useNavigate } from "react-router-dom";
-import { FaSignOutAlt } from "react-icons/fa";
 
-// Styled Components
-const TopBarContainer = styled.header`
-  width: calc(100% - 250px);
+const TopBarContainer = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
   height: 60px;
-  background-color: ${({ theme }) => theme.colors.cardBackground};
+  background-color: ${({ theme }) => theme.colors.topBarBackground};
+  color: ${({ theme }) => theme.colors.topBarText};
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1rem;
-  margin-left: 250px;
-  box-shadow: ${({ theme }) => theme.shadows.medium};
-  position: fixed;
-  top: 0;
+  padding: 0 1.5rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   z-index: 1000;
-
-  @media (max-width: 768px) {
-    width: 100%;
-    margin-left: 0;
-  }
 `;
 
 const Title = styled.h1`
   color: ${({ theme }) => theme.colors.primary};
-  font-size: 1.2rem;
 `;
 
-const LogoutButton = styled.button`
+const UserMenu = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background-color: ${({ theme }) => theme.colors.primary};
-  color: ${({ theme }) => theme.colors.textSecondary};
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: ${({ theme }) => theme.borderRadius};
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
+  gap: 1rem;
 
-  &:hover {
-    background-color: ${({ theme }) => theme.colors.primaryHover};
-  }
-
-  svg {
-    font-size: 1.2rem;
+  button {
+    background-color: transparent;
+    border: none;
+    color: ${({ theme }) => theme.colors.topBarText};
+    cursor: pointer;
+    &:hover {
+      text-decoration: underline;
+    }
   }
 `;
 
-// Admin Top Bar Component
 const AdminTopBar = () => {
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    localStorage.removeItem("adminToken");
-    navigate("/admin/login");
-  };
-
   return (
     <TopBarContainer>
       <Title>Admin Dashboard</Title>
-      <LogoutButton onClick={handleLogout}>
-        <FaSignOutAlt />
-        Logout
-      </LogoutButton>
+      <UserMenu>
+        <span>Welcome, Admin</span>
+        <button>Logout</button>
+      </UserMenu>
     </TopBarContainer>
   );
 };

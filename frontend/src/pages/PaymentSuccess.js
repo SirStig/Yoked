@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import styled, { css } from "styled-components";
 import { toast } from "react-toastify";
 import { verifyPayment } from "../api/paymentApi";
-import { useContext } from "react";
 import { AuthContext } from "../contexts/AuthContext"; // Import AuthContext
 
 // Styled Components
@@ -12,7 +11,7 @@ const Container = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+  height: 100%;
   text-align: center;
 `;
 
@@ -36,6 +35,7 @@ const Button = styled.button`
   border-radius: ${({ theme }) => theme.borderRadius};
   cursor: pointer;
   margin-top: 20px;
+  transition: background-color 0.3s;
 
   &:hover {
     background-color: ${({ theme }) => theme.colors.primaryHover};
@@ -80,7 +80,11 @@ const PaymentSuccess = () => {
   }, [searchParams, loadUser]); // Make sure loadUser is part of the dependency array
 
   const handleRedirect = () => {
-    navigate(success ? "/dashboard" : "/choose-subscription");
+    if (success) {
+      navigate("/dashboard"); // Redirect to dashboard
+    } else {
+      navigate("/dashboard", { state: { overlay: "subscriptionSelection" } }); // Retry subscription in overlay
+    }
   };
 
   return (

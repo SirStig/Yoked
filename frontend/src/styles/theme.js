@@ -1,68 +1,133 @@
 export const theme = {
   colors: {
-    primary: "#ff5722", // Vibrant accent for call-to-actions
-    primaryHover: "#ff784e", // Hover effect for primary elements
-    secondary: "#121212", // Slightly lighter background for contrast
-    accent: "#ffa726", // Bright accent for highlights
-    gradientPrimary: "linear-gradient(90deg, #ff5722, #ffa726)", // Gradient for buttons and key areas
-    gradientSecondary: "linear-gradient(45deg, #ff784e, #ff3d00)", // Secondary gradient for emphasis
-    textPrimary: "#ffffff", // Main text color
-    textSecondary: "#e0e0e0", // Softer muted text
-    cardBackground: "#1f1f1f", // Elevated card background
-    inputBackground: "#2b2b2b", // Subtle background for inputs
-    inputBorder: "#404040", // Inputs and border emphasis
-    error: "#e53935", // Error color for messages
-    errorBackground: "#4e1c1c", // Background for error messages
-    success: "#43a047", // Success states
-    successBackground: "#1e4620", // Success message background
-    info: "#1e88e5", // Info messages or states
-    infoBackground: "#123456", // Background for informational messages
-    warning: "#fb8c00", // Warning messages
-    warningBackground: "#4a350c", // Warning background
-    disabled: "#6d6d6d", // Disabled states
-    link: "#42a5f5", // Link color
-    linkHover: "#1976d2", // Hover state for links
+    // Primary and secondary colors
+    primary: "#ffffff", // White for buttons and accents
+    primaryHover: "#b6b6b6", // Light gray for hover states
+    secondary: "#1B1B1B", // Deep smoky black for background
+
+    // Accent and highlights
+    accent: "#d5b50d", // Bright gold for interactive elements
+    accentHover: "#b89a0a", // Slightly darker gold for hover states
+
+    // Gradients
+    gradientPrimary: "linear-gradient(90deg, #4A90E2, #357ABD)", // Blue gradient
+    gradientSecondary: "linear-gradient(45deg, #4B0082, #800080)", // Indigo to purple
+    gradientAccent: "linear-gradient(90deg, #FFD700, #4A90E2)", // Gold to blue
+    gradientCool: "linear-gradient(90deg, #87CEEB, #4682B4)", // Cool tones
+    gradientProfessional: "linear-gradient(90deg, #1B1B1B, #3A3A3A)", // Dark gray gradient
+
+    // Text colors
+    textPrimary: "#ffffff", // White for primary text
+    textSecondary: "#CCCCCC", // Muted gray for secondary text
+    textAccent: "#4A90E2", // Blue for accent text
+    textButton: "#393939", // Dark gray for buttons
+
+    // Backgrounds
+    cardBackground: "#2F2F2F", // Smoky gray for cards
+    inputBackground: "#3A3A3A", // Subtle gray for inputs
+    inputBorder: "#505050", // Dark gray for input borders
+    dropdownBackground: "#20232A", // Neutral dark gray for dropdowns
+    tooltipBackground: "#333333", // Dark gray for tooltips
+    overlayBackground: "rgba(0, 0, 0, 0.8)", // Dark overlay for modals
+    sidebarBackground: "#111117", // Dark navy for sidebars
+    sidebarHover: "#191922", // Lighter shade for sidebar hover states
+    sidebarActive: "#FFD700", // Gold to highlight active sidebar items
+
+    // Feedback colors
+    error: "#FF0000", // Bright red for errors
+    errorBackground: "#4A0000", // Dark red for error backgrounds
+    success: "#32CD32", // Lime green for success
+    successBackground: "#003300", // Dark green for success backgrounds
+    info: "#00CED1", // Aqua for informational elements
+    warning: "#FFA500", // Bright orange for warnings
+    disabled: "#A9A9A9", // Muted gray for disabled elements
+
+    // Links and badges
+    link: "#87CEEB", // Sky blue for links
+    linkHover: "#4682B4", // Steel blue for link hover states
+    badgeBackground: "#357ABD", // Blue for badges
   },
+
   font: {
-    family: "'Poppins', 'Inter', sans-serif", // Clean and professional font stack
-    size: "16px", // Default font size
+    family: "'Poppins', 'Roboto', sans-serif", // Modern and clean fonts
+    baseSize: "16px", // Base font size
     weightLight: 300,
     weightRegular: 400,
     weightBold: 700,
-    headingSize: "32px", // Large headings
-    subheadingSize: "24px", // Subheadings
+    headingSize: "3rem", // Large heading size
+    subheadingSize: "2rem", // Subheading size
+    smallSize: "0.875rem", // Small text size
   },
-  spacing: (factor) => `${factor * 8}px`, // Spacing system (e.g., spacing(2) = 16px)
-  borderRadius: "16px", // Slightly larger radius for a modern aesthetic
+
+  spacing: (factor) => `${factor * 8}px`, // Spacing multiplier
+
+  borderRadius: {
+    small: "4px", // For small elements
+    medium: "8px", // Default border radius
+    large: "12px", // Rounded corners for larger components
+  },
+
   transitions: {
-    default: "all 0.3s ease", // Default transition
+    default: "all 0.3s ease-in-out", // Smooth transitions
     fast: "all 0.2s ease-in-out",
-    slow: "all 0.5s ease-in-out",
-    hoverGlow: "box-shadow 0.4s ease-in-out", // Glow for hover effects
+    hoverGlow: "box-shadow 0.4s ease-in-out", // Glow effect for hover states
   },
+
   breakpoints: {
     xs: "480px", // Mobile devices
     sm: "768px", // Tablets
     md: "1024px", // Small laptops
-    lg: "1440px", // Desktop
+    lg: "1440px", // Desktops
     xl: "1920px", // Large screens
   },
+
   shadows: {
     light: "0 2px 4px rgba(0, 0, 0, 0.2)",
     medium: "0 4px 8px rgba(0, 0, 0, 0.4)",
     heavy: "0 6px 12px rgba(0, 0, 0, 0.6)",
-    glow: "0 0 12px rgba(255, 87, 34, 0.8)", // Glow effect for key elements
+    glow: "0 0 15px rgba(74, 144, 226, 0.8)", // Glow effect for blue elements
+    inset: "inset 0 2px 4px rgba(0, 0, 0, 0.6)", // Inset shadow for depth
   },
+
+  components: {
+    // Specific component styles
+    dropdown: {
+      background: "#20232A", // Neutral dark gray
+      border: "#4B5563", // Border for dropdowns
+      text: "#FFFFFF", // White text
+      hoverBackground: "#32363E", // Slightly lighter on hover
+    },
+    sidebar: {
+      background: "#111117",
+      hover: "#191922",
+      active: "#FFD700",
+      text: "#CCCCCC", // Muted gray text
+      activeText: "#FFFFFF", // Bright white for active items
+    },
+    button: {
+      background: "#4A90E2", // Calm blue
+      hoverBackground: "#357ABD", // Slightly darker blue
+      text: "#FFFFFF", // White for button text
+    },
+    tooltip: {
+      background: "#333333",
+      text: "#FFFFFF",
+    },
+    overlay: {
+      background: "rgba(0, 0, 0, 0.8)", // Dark overlay
+    },
+  },
+
   animations: {
     fadeIn: "fade-in 0.5s ease-in-out",
     slideUp: "slide-up 0.6s ease-in-out",
     scaleUp: "scale-up 0.4s ease-in-out",
     hoverPulse: "hover-pulse 0.8s infinite ease-in-out", // Subtle pulsing animation
-    gradientShift: "gradient-shift 3s ease-in-out infinite", // Dynamic gradient effect
+    gradientShift: "gradient-shift 3s ease-in-out infinite", // Dynamic gradient animation
   },
 };
 
-// Keyframes for animations (can be added in GlobalStyles)
+// Keyframes for animations
 export const animations = `
   @keyframes fade-in {
     from {

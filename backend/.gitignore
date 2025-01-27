@@ -5,8 +5,9 @@ __pycache__/
 
 # Virtual environment
 venv/
-env/
+.env/
 *.env
+*.venv
 
 # Local environment files
 .env
@@ -15,27 +16,36 @@ env/
 *.log
 *.sqlite3
 *.db
+project_yoked.log
+*.bak
+*.dat
+*.dir
+/dump.rdb
+/temp-*.rdb
 
 # Testing outputs
 .coverage
-nosetests.xml
 coverage.xml
+nosetests.xml
 *.cover
 *.py,cover
+.pytest_cache/
 
 # IDE and editor settings
 .idea/
 .vscode/
 *.swp
 
-# Misc
-.DS_Store
-.gitignore
-.idea/
+# Alembic migrations cache
+alembic/versions/*.pyc
+alembic/versions/__pycache__/
 
-.bak
-.dat
-.dir
-.log.
-.log
-/dump.rdb
+# Miscellaneous
+.DS_Store
+*.~undo-tree~
+*.swo
+*.swn
+Thumbs.db
+
+# Ignore compiled Python bytecode in alembic versions
+alembic/versions/__pycache__/

@@ -1,0 +1,51 @@
+# Byte-compiled / optimized / compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+*.env
+*.venv
+
+# Local environment files
+.env
+
+# Logs and local database
+*.log
+*.sqlite3
+*.db
+project_yoked.log
+*.bak
+*.dat
+*.dir
+/dump.rdb
+/temp-*.rdb
+
+# Testing outputs
+.coverage
+coverage.xml
+nosetests.xml
+*.cover
+*.py,cover
+.pytest_cache/
+
+# IDE and editor settings
+.idea/
+.vscode/
+*.swp
+
+# Alembic migrations cache
+alembic/versions/*.pyc
+alembic/versions/__pycache__/
+
+# Miscellaneous
+.DS_Store
+*.~undo-tree~
+*.swo
+*.swn
+Thumbs.db
+
+# Ignore compiled Python bytecode in alembic versions
+alembic/versions/__pycache__/

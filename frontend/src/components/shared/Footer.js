@@ -6,39 +6,44 @@ import { useNavigate } from "react-router-dom";
 const FooterContainer = styled.footer`
   background: ${({ theme }) => theme.colors.cardBackground};
   color: ${({ theme }) => theme.colors.textPrimary};
-  padding: ${({ theme }) => theme.spacing(4)} ${({ theme }) => theme.spacing(2)};
+  padding: ${({ theme }) => theme.spacing(6)} ${({ theme }) => theme.spacing(4)};
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: ${({ theme }) => theme.spacing(4)};
+  gap: ${({ theme }) => theme.spacing(6)};
   box-shadow: ${({ theme }) => theme.shadows.medium};
   text-align: center;
+  width: 100%;
 
   @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
-    padding: ${({ theme }) => theme.spacing(2)};
+    padding: ${({ theme }) => theme.spacing(4)};
   }
 `;
 
 // Links section container
 const LinksSection = styled.div`
   display: flex;
-  gap: ${({ theme }) => theme.spacing(6)};
-  justify-content: center;
+  gap: ${({ theme }) => theme.spacing(8)};
+  justify-content: space-evenly;
   flex-wrap: wrap;
   width: 100%;
+  max-width: 1200px;
 `;
 
 // Individual category container
 const CategoryContainer = styled.div`
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: ${({ theme }) => theme.spacing(1)};
+  width: 200px;
 
   h4 {
-    font-size: 1.2rem;
-    color: ${({ theme }) => theme.colors.textPrimary};
-    margin-bottom: ${({ theme }) => theme.spacing(1)};
+    font-size: 1.3rem;
+    color: ${({ theme }) => theme.colors.accent};
+    margin-bottom: ${({ theme }) => theme.spacing(2)};
+    border-bottom: 2px solid ${({ theme }) => theme.colors.accent};
+    padding-bottom: ${({ theme }) => theme.spacing(1)};
   }
 
   a {
@@ -48,7 +53,7 @@ const CategoryContainer = styled.div`
     transition: color ${({ theme }) => theme.transitions.default};
 
     &:hover {
-      color: ${({ theme }) => theme.colors.accent};
+      color: ${({ theme }) => theme.colors.primary};
     }
   }
 `;
@@ -57,6 +62,14 @@ const CategoryContainer = styled.div`
 const TrademarkText = styled.div`
   font-size: 0.9rem;
   color: ${({ theme }) => theme.colors.textSecondary};
+  margin-top: ${({ theme }) => theme.spacing(4)};
+`;
+
+const Divider = styled.div`
+  width: 100%;
+  height: 2px;
+  background: ${({ theme }) => theme.colors.textSecondary};
+  margin-top: ${({ theme }) => theme.spacing(4)};
 `;
 
 // Footer Component
@@ -86,8 +99,8 @@ const Footer = () => {
         {/* Legal Links */}
         <CategoryContainer>
           <h4>Legal</h4>
-          <a onClick={() => navigate("/privacy-policy")}>Privacy Policy</a>
-          <a onClick={() => navigate("/terms-and-conditions")}>Terms & Conditions</a>
+          <a onClick={() => navigate("/legal/privacy")}>Privacy Policy</a>
+          <a onClick={() => navigate("/legal/terms")}>Terms & Conditions</a>
         </CategoryContainer>
 
         {/* Support Links */}
@@ -97,6 +110,8 @@ const Footer = () => {
           <a href="mailto:support@yoked.com">Contact Us</a>
         </CategoryContainer>
       </LinksSection>
+
+      <Divider />
 
       {/* Trademark */}
       <TrademarkText>© {new Date().getFullYear()} Yoked. All rights reserved.</TrademarkText>

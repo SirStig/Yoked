@@ -19,42 +19,46 @@ class AdminValidationMiddleware(BaseHTTPMiddleware):
         WHITELISTED_IPS = settings.ADMIN_WHITELISTED_IPS  # List of IPs allowed
         SUPERUSER_SECRET_KEY = settings.SUPERUSER_CREATION_SECRET_KEY
 
-        # Define routes requiring special handling
-        CREATE_ROUTE = "/api/admin/create"
-        LOGIN_ROUTE = "/api/admin/login"
+        # Define routes exempt from session validation or requiring special handling
+        EXEMPT_ROUTES = [
+            "/api/admin/create",  # Special handling: Requires IP and secret key validation
+            "/api/admin/login",
+            "/api/admin/mfa/setup",
+            "/api/admin/mfa/verify",
+        ]
 
-        # Handle the `/create` route (requires white-listed IP and secret key)
-        if request.url.path == CREATE_ROUTE:
-            client_ip = request.client.host
-            provided_secret_key = request.headers.get("X-Superuser-Secret")
-            if not provided_secret_key:
-                logger.warning("No superuser secret key provided in the headers.")
-                return JSONResponse(
-                    {"detail": "Missing superuser secret key."},
-                    status_code=403,
-                )
+        logger.debug(f"Processing request to: {request.url.path}")
 
-            # Validate IP
-            if client_ip not in WHITELISTED_IPS:
-                logger.warning(f"Unauthorized IP for /create: {client_ip}")
-                return JSONResponse(
-                    {"detail": "Access denied. Unauthorized IP."},
-                    status_code=403,
-                )
+        # Handle exempt routes
+        if request.url.path in EXEMPT_ROUTES:
+            # Special handling for the `/create` route
+            if request.url.path == "/api/admin/create":
+                client_ip = request.client.host
+                provided_secret_key = request.headers.get("X-Superuser-Secret")
+                if not provided_secret_key:
+                    logger.warning("No superuser secret key provided in the headers.")
+                    return JSONResponse(
+                        {"detail": "Missing superuser secret key."},
+                        status_code=403,
+                    )
 
-            # Validate secret key
-            if provided_secret_key != SUPERUSER_SECRET_KEY:
-                logger.warning("Invalid superuser secret key for /create.")
-                return JSONResponse(
-                    {"detail": "Invalid secret key."},
-                    status_code=403,
-                )
+                # Validate IP
+                if client_ip not in WHITELISTED_IPS:
+                    logger.warning(f"Unauthorized IP for /create: {client_ip}")
+                    return JSONResponse(
+                        {"detail": "Access denied. Unauthorized IP."},
+                        status_code=403,
+                    )
 
-            # If valid, allow the request
-            return await call_next(request)
+                # Validate secret key
+                if provided_secret_key != SUPERUSER_SECRET_KEY:
+                    logger.warning("Invalid superuser secret key for /create.")
+                    return JSONResponse(
+                        {"detail": "Invalid secret key."},
+                        status_code=403,
+                    )
 
-        # Handle the `/login` route (exempted from IP and token validation)
-        if request.url.path == LOGIN_ROUTE:
+            # Allow exempt routes to proceed without further checks
             return await call_next(request)
 
         # For other `/api/admin` routes, perform session validation

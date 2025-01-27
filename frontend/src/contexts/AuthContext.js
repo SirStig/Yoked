@@ -1,17 +1,16 @@
 import React, { createContext, useState, useEffect } from "react";
 import { toast } from "react-toastify";
-import { registerUser, loginUser, logoutUser } from "../api/authApi"; // Import auth APIs
-import { getProfile, getProfileVersion } from "../api/userApi"; // Import user profile APIs
-import { useNavigate } from "react-router-dom";  // Import navigate
+import { registerUser, loginUser, logoutUser } from "../api/authApi";
+import { getProfile, getProfileVersion } from "../api/userApi";
+import { useNavigate } from "react-router-dom";
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true); // To handle loading states
-  const navigate = useNavigate();  // Initialize navigate for programmatic navigation
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-  // Fetch cached profile and version from localStorage
   const getCachedProfile = () => {
     const cachedProfile = localStorage.getItem("profile");
     const cachedVersion = localStorage.getItem("profileVersion");
@@ -21,46 +20,35 @@ export const AuthProvider = ({ children }) => {
     };
   };
 
-  // Cache profile and version in localStorage
   const cacheProfile = (profile, version) => {
     localStorage.setItem("profile", JSON.stringify(profile));
     localStorage.setItem("profileVersion", version.toString());
   };
 
-  // Register a new user
   const register = async (userData) => {
     try {
-      console.log("Registering user...");
       const response = await registerUser(userData);
-      console.log("Registration response:", response);
       localStorage.setItem("token", response.access_token);
-      console.log("Token stored in localStorage:", response.access_token);
-      await loadUser(true); // Force reload profile after registration
+      await loadUser(true);
     } catch (error) {
-      console.error("Registration error:", error);
+      toast.error(error.message || "Registration failed.");
+      throw error;
     }
   };
 
-  // Login user
   const login = async (email, password, isMobile = false) => {
     try {
       const response = await loginUser(email, password, isMobile);
-
-      // Save token to localStorage
       localStorage.setItem("token", response.access_token);
-      console.log("Token stored in localStorage:", response.access_token);
-
-      // Load user profile
-      const user = await loadUser(true); // Force reload profile after login
+      const user = await loadUser(true);
       toast.success("Login successful!");
-      return user; // Return the user object for navigation logic
+      return user;
     } catch (error) {
       toast.error(error.message || "Login failed.");
       throw error;
     }
   };
 
-  // Load the current user profile with optional force reload
   const loadUser = async (forceReload = false) => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -70,53 +58,54 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const latestVersion = await getProfileVersion(); // Fetch profile version from /profile endpoint
+      const latestVersion = await getProfileVersion();
       const { profile: cachedProfile, version: cachedVersion } = getCachedProfile();
 
-      // If version matches, use the cached profile
       if (!forceReload && cachedVersion === latestVersion && cachedProfile) {
         setCurrentUser(cachedProfile);
       } else {
-        // Fetch fresh profile data
         const user = await getProfile();
-        cacheProfile(user, latestVersion);  // Cache the fresh profile data
+        cacheProfile(user, latestVersion);
         setCurrentUser(user);
       }
 
-      // Redirect based on setup_step (ensure we use the updated route names)
       if (currentUser?.setup_step) {
-        const step = currentUser.setup_step;
-        const setupRoutes = {
-          "verify_email": "/verify_email",
-          "profile_completion": "/profile-setup",
-          "subscription_selection": "/choose-subscription",
-        };
-
-        if (step !== "completed" && setupRoutes[step]) {
-          navigate(setupRoutes[step]);
+        switch (currentUser.setup_step) {
+          case "verify_email":
+            navigate("/verify-email");
+            break;
+          case "profile_completion":
+            navigate("/dashboard", { state: { overlay: "profileCompletion" } });
+            break;
+          case "subscription_selection":
+            navigate("/dashboard", { state: { overlay: "subscriptionSelection" } });
+            break;
+          case "completed":
+            navigate("/dashboard");
+            break;
+          default:
+            navigate("/");
+            break;
         }
       }
     } catch (error) {
-      console.error("Error loading user profile:", error);
       toast.error("Failed to load profile. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Logout user
   const logout = async () => {
     try {
       await logoutUser();
       setCurrentUser(null);
-      localStorage.clear(); // Clear all cached data
+      localStorage.clear();
       toast.success("Logged out successfully.");
     } catch (error) {
       toast.error(error.message || "Failed to log out.");
     }
   };
 
-  // Initialize user data on app load
   useEffect(() => {
     loadUser();
   }, []);

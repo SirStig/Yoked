@@ -47,6 +47,7 @@ const GlobalStyles = createGlobalStyle`
     animation: fade-in 0.5s ease-in-out;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
 
   a {
@@ -73,7 +74,7 @@ const GlobalStyles = createGlobalStyle`
 
     &:hover {
       box-shadow: ${({ theme }) => theme.shadows.glow};
-      transform: scale(1.02); /* Subtle lift effect */
+      transform: scale(1.02);
     }
 
     &:disabled {
@@ -87,6 +88,7 @@ const GlobalStyles = createGlobalStyle`
     font-weight: ${({ theme }) => theme.font.weightBold};
     color: ${({ theme }) => theme.colors.textPrimary};
     text-align: center;
+    line-height: 1.2;
   }
 
   h1 {
@@ -115,7 +117,7 @@ const GlobalStyles = createGlobalStyle`
   }
 
   p {
-    line-height: 1.6;
+    line-height: 1.8;
     font-size: 1.1rem;
     color: ${({ theme }) => theme.colors.textSecondary};
   }
@@ -145,7 +147,7 @@ const GlobalStyles = createGlobalStyle`
 
   /* Card Styles */
   .card {
-    background: ${({ theme }) => theme.colors.gradientSecondary};
+    background: ${({ theme }) => theme.colors.cardBackground};
     box-shadow: ${({ theme }) => theme.shadows.medium};
     border-radius: ${({ theme }) => theme.borderRadius};
     padding: ${({ theme }) => theme.spacing(3)};
@@ -154,7 +156,7 @@ const GlobalStyles = createGlobalStyle`
 
     &:hover {
       box-shadow: ${({ theme }) => theme.shadows.glow};
-      transform: scale(1.05); /* Slight lift on hover */
+      transform: scale(1.05);
     }
   }
 
@@ -176,20 +178,8 @@ const GlobalStyles = createGlobalStyle`
     }
   }
 
-  /* Hero Section */
-  .hero-section {
-    background: ${({ theme }) => theme.colors.gradientPrimary};
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: ${({ theme }) => theme.colors.textPrimary};
-    text-align: center;
-    animation: slide-up 0.8s ease-in-out;
-  }
-
   /* Responsive Design */
-  @media (max-width: 768px) {
+  @media (max-width: ${({ theme }) => theme.breakpoints.sm}) {
     body {
       font-size: 0.9rem;
     }
@@ -207,7 +197,7 @@ const GlobalStyles = createGlobalStyle`
     }
   }
 
-  @media (max-width: 480px) {
+  @media (max-width: ${({ theme }) => theme.breakpoints.xs}) {
     body {
       font-size: 0.8rem;
     }

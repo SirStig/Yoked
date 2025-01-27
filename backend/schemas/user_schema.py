@@ -1,8 +1,13 @@
+from pydantic import BaseModel, Field, EmailStr, PositiveInt, PositiveFloat
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field, PositiveFloat, PositiveInt
-from typing import List, Optional
+from typing import Optional, List
 from datetime import datetime
 from enum import Enum
+
+
+class NotificationPreferences(BaseModel):
+    email_notifications: bool = Field(..., description="Whether the user receives email notifications")
+    push_notifications: bool = Field(..., description="Whether the user receives push notifications")
 
 
 class Token(BaseModel):
@@ -83,6 +88,8 @@ class UserCreate(UserBase):
     )
     age: Optional[PositiveInt] = Field(None, description="Age of the user")
     gender: Optional[str] = Field(None, description="Gender of the user")
+    email_notifications: Optional[bool] = Field(True, description="Email notification preference")
+    push_notifications: Optional[bool] = Field(True, description="Push notification preference")
 
 
 # noinspection PyDataclass
@@ -97,6 +104,8 @@ class UserOut(UserBase):
     joined_at: datetime = Field(..., description="Date and time the user joined")
     friends: List[UUID] = Field(default_factory=list, description="List of friend IDs")
     progress_photos: Optional[List[ProgressPhoto]] = Field(default_factory=list, description="List of progress photos uploaded by the user")
+    email_notifications: bool = Field(..., description="Email notification preference")
+    push_notifications: bool = Field(..., description="Push notification preference")
 
     class Config:
         from_attributes = True
@@ -122,6 +131,8 @@ class UserProfile(UserBase):
     user_type: UserType = Field(..., description="Type of user (regular or admin)")
     friends: List[UUID] = Field(default_factory=list, description="List of friend IDs")
     progress_photos: Optional[List[ProgressPhoto]] = Field(default_factory=list, description="List of progress photos uploaded by the user")
+    email_notifications: bool = Field(..., description="Email notification preference")
+    push_notifications: bool = Field(..., description="Push notification preference")
 
     class Config:
         from_attributes = True
@@ -140,6 +151,8 @@ class UserProfileUpdate(BaseModel):
     weight_unit: Optional[str] = Field(None, description="Unit for weight")
     activity_level: Optional[ActivityLevel] = Field(None, description="Activity level of the user")
     setup_step: Optional[SetupStep] = Field(None, description="Current setup step of the user")
+    email_notifications: Optional[bool] = Field(None, description="Email notification preference")
+    push_notifications: Optional[bool] = Field(None, description="Push notification preference")
 
     class Config:
         from_attributes = True
@@ -150,14 +163,18 @@ class LoginRequest(BaseModel):
     password: str = Field(..., description="Password for login")
     is_mobile: bool = Field(False, description="Indicates if login is from a mobile device")
 
+
 class UserMFASetup(BaseModel):
     user_id: UUID = Field(..., description="User ID of the admin")
     mfa_secret: str = Field(..., description="MFA secret key for setup")
     totp_code: str = Field(..., description="One-time TOTP code for verification")
 
+
 class UserMFAVerify(BaseModel):
     user_id: UUID = Field(..., description="User ID of the admin")
     totp_code: str = Field(..., description="One-time TOTP code for verification")
+    session_token: str
+
 
 class AdminUserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, description="Full name of the admin user")

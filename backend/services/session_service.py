@@ -3,8 +3,9 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
-from backend.models.session import Session as SessionModel
+from backend.models.session import SessionModel as SessionModel
 from backend.core.logging_config import get_logger
+from backend.schemas.session_schema import UserSession
 from uuid import UUID
 
 # Logger setup
@@ -14,15 +15,13 @@ logger = get_logger(__name__)
 WEB_SESSION_DURATION = timedelta(days=7)  # Web session duration
 MOBILE_SESSION_DURATION = timedelta(days=365)  # Mobile session duration
 
-
 def generate_token() -> str:
     """Generate a unique session token."""
     token = str(uuid.uuid4())
     logger.debug(f"Generated session token: {token}")
     return token
 
-
-def create_session(user_id: UUID, db: Session, is_mobile: bool = False) -> str:
+def create_session(user_id: UUID, db: Session, is_mobile: bool = False, mfa_verified: bool = False, device_type: str = None, location: str = None, ip_address: str = None) -> str:
     """
     Create a new session for the user or return an existing active session.
     """
@@ -50,6 +49,11 @@ def create_session(user_id: UUID, db: Session, is_mobile: bool = False) -> str:
             token=token,
             expires_at=expires_at,
             is_mobile=is_mobile,
+            mfa_verified=mfa_verified,
+            device_type=device_type,
+            location=location,
+            ip_address=ip_address,
+            last_activity=datetime.utcnow()
         )
         db.add(new_session)
         db.commit()
@@ -61,8 +65,6 @@ def create_session(user_id: UUID, db: Session, is_mobile: bool = False) -> str:
         logger.error(f"Failed to create or fetch session for user_id: {user_id}. Error: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to create session")
-
-
 
 def validate_session(token: str, db: Session) -> SessionModel:
     """
@@ -82,9 +84,11 @@ def validate_session(token: str, db: Session) -> SessionModel:
         db.commit()
         raise HTTPException(status_code=401, detail="Session expired")
 
+    session.last_activity = datetime.utcnow()
+    db.commit()
+
     logger.info(f"Session validated: {session.id}, user_id: {session.user_id}")
     return session
-
 
 def invalidate_session(user_id: UUID, db: Session, is_mobile: bool = None):
     """
@@ -104,7 +108,6 @@ def invalidate_session(user_id: UUID, db: Session, is_mobile: bool = None):
     except SQLAlchemyError as e:
         logger.error(f"Failed to invalidate sessions for user_id: {user_id}, error: {e}")
         raise HTTPException(status_code=500, detail="Failed to invalidate sessions")
-
 
 def invalidate_specific_session(token: str, db: Session):
     """
@@ -127,8 +130,6 @@ def invalidate_specific_session(token: str, db: Session):
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to invalidate session")
 
-
-
 def get_active_sessions(user_id: UUID, db: Session, is_mobile: bool = None):
     """
     Retrieve active sessions for the user.
@@ -145,8 +146,65 @@ def get_active_sessions(user_id: UUID, db: Session, is_mobile: bool = None):
         if is_mobile is not None:
             query = query.filter(SessionModel.is_mobile == is_mobile)
         sessions = query.all()
-        logger.info(f"Retrieved {len(sessions)} active session(s) for user_id: {user_id}")
-        return sessions
+
+        # Map sessions to schema for output
+        session_list = [
+            UserSession(
+                id=session.id,
+                user_id=session.user_id,
+                token=session.token,
+                created_at=session.created_at,
+                expires_at=session.expires_at,
+                is_mobile=session.is_mobile,
+                mfa_verified=session.mfa_verified,
+                device_type=session.device_type,
+                location=session.location,
+                ip_address=session.ip_address,
+                last_activity=session.last_activity,
+            )
+            for session in sessions
+        ]
+
+        logger.info(f"Retrieved {len(session_list)} active session(s) for user_id: {user_id}")
+        return session_list
     except SQLAlchemyError as e:
         logger.error(f"Failed to fetch active sessions for user_id: {user_id}, error: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch active sessions")
+
+def fetch_user_sessions(user_id: UUID, db: Session):
+    """
+    Fetch all active sessions for a user.
+    :param user_id: The ID of the user whose sessions to fetch.
+    :param db: The database session.
+    :return: List of UserSession objects.
+    """
+    logger.info(f"Fetching active sessions for user_id: {user_id}")
+    try:
+        sessions = db.query(SessionModel).filter(
+            SessionModel.user_id == user_id,
+            SessionModel.expires_at > datetime.utcnow()
+        ).all()
+
+        session_data = [
+            UserSession(
+                id=session.id,
+                user_id=session.user_id,
+                token=session.token,
+                created_at=session.created_at,
+                expires_at=session.expires_at,
+                is_mobile=session.is_mobile,
+                mfa_verified=session.mfa_verified,
+                device_type=session.device_type,
+                location=session.location,
+                ip_address=session.ip_address,
+                last_activity=session.last_activity,
+            )
+            for session in sessions
+        ]
+
+        logger.info(f"Fetched {len(session_data)} session(s) for user_id: {user_id}")
+        return session_data
+    except SQLAlchemyError as e:
+        logger.error(f"Failed to fetch sessions for user_id: {user_id}, error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch sessions")
+

@@ -1,54 +1,33 @@
 import React, { useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import styled, { keyframes } from "styled-components";
 import { AuthContext } from "../contexts/AuthContext";
-import styled from "styled-components";
 import { toast } from "react-toastify";
 
-// Styled Components
-const Container = styled.div`
-  position: relative;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-
-  .video-background {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    z-index: 0;
+// Animation for overlay appearance
+const fadeIn = keyframes`
+  from {
+    opacity: 0;
+    transform: scale(0.9);
   }
-
-  .video-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-    z-index: 0;
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 `;
 
-const FormWrapper = styled.div`
-  z-index: 1;
-  width: 90%;
-  max-width: 400px;
-  background-color: ${({ theme }) => theme.colors.cardBackground};
+// Styled Components
+const Container = styled.div`
   padding: 2rem;
-  border-radius: ${({ theme }) => theme.borderRadius};
-  box-shadow: ${({ theme }) => theme.shadows.medium};
+  width: 100%;
+  max-width: 400px;
+  animation: ${fadeIn} 0.3s ease-in-out;
   text-align: center;
+`;
 
-  h1 {
-    margin-bottom: 1rem;
-    color: ${({ theme }) => theme.colors.textPrimary};
-  }
+const Title = styled.h1`
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: ${({ theme }) => theme.colors.textPrimary};
 `;
 
 const Form = styled.form`
@@ -59,7 +38,7 @@ const Form = styled.form`
 
 const Input = styled.input`
   width: 100%;
-  padding: 1rem;
+  padding: 0.8rem;
   border: 1px solid ${({ theme }) => theme.colors.inputBorder};
   border-radius: ${({ theme }) => theme.borderRadius};
   background-color: ${({ theme }) => theme.colors.inputBackground};
@@ -77,55 +56,19 @@ const Button = styled.button`
   font-size: 1.1rem;
   font-weight: bold;
   cursor: pointer;
+  transition: background-color 0.3s;
 
   &:hover {
     background-color: ${({ theme }) => theme.colors.primaryHover};
   }
 `;
 
-const ErrorMessage = styled.p`
-  color: ${({ theme }) => theme.colors.error};
-  font-size: 0.9rem;
-  margin-top: 0.5rem;
-`;
-
 const LinkText = styled.p`
+  margin-top: 1rem;
   font-size: 0.9rem;
   color: ${({ theme }) => theme.colors.textSecondary};
-  margin-top: 1rem;
-
-  a {
-    color: ${({ theme }) => theme.colors.textPrimary};
-    text-decoration: none;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
-  button {
-    background-color: transparent;
-    border: none;
-    color: ${({ theme }) => theme.colors.textPrimary};
-    font-size: 1rem;
-    cursor: pointer;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-`;
-
-const BackButton = styled.button`
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  padding: 0.5rem;
-  background-color: transparent;
-  border: none;
-  color: ${({ theme }) => theme.colors.textPrimary};
-  font-size: 1.5rem;
   cursor: pointer;
+  text-decoration: underline;
 
   &:hover {
     color: ${({ theme }) => theme.colors.primaryHover};
@@ -135,93 +78,51 @@ const BackButton = styled.button`
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { login } = useContext(AuthContext);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
+    setIsLoading(true);
 
     try {
-      const user = await login(email, password);
-      console.log("User after login:", user);
+      await login(email, password);
       toast.success("Login successful!");
-
-      // Navigate based on setup_step
-      if (user?.setup_step === "completed") {
-        navigate("/dashboard");
-      } else if (user?.setup_step === "profile_completion") {
-        navigate("/profile-setup");
-      } else if (user?.setup_step === "subscription_selection") {
-        navigate("/choose-subscription");
-      } else if (user?.setup_step === "verify_email") {
-        navigate("/verify-email");
-      } else {
-        navigate("/dashboard"); // Fallback path in case setup_step is undefined
-      }
-    } catch (err) {
-      setError(err.message || "Invalid email or password");
-      toast.error(err.message || "Login failed. Please try again.");
+    } catch (error) {
+      toast.error(error.message || "Login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleBackClick = () => {
-    navigate("/"); // Navigate to the home page when back button is clicked
-  };
-
   const handleForgotPasswordClick = () => {
-    navigate("/forgot-password"); // Navigate to a password reset page (you can implement later)
-  };
-
-  const handleRegisterClick = () => {
-    navigate("/register"); // Navigate to the register page
+    toast.info("Password reset feature coming soon!");
   };
 
   return (
     <Container>
-      <video
-        className="video-background"
-        autoPlay
-        loop
-        muted
-        src="https://videos.pexels.com/video-files/4761426/4761426-uhd_4096_2160_25fps.mp4"
-      />
-      <div className="video-overlay"></div>
-      <FormWrapper>
-        {/* Back Button */}
-        <BackButton onClick={handleBackClick}>←</BackButton>
-
-        <h1>Welcome Back!</h1>
-        <Form onSubmit={handleSubmit}>
-          <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <Input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <Button type="submit">Login</Button>
-        </Form>
-        {error && <ErrorMessage>{error}</ErrorMessage>}
-
-        <LinkText>
-          <button onClick={handleForgotPasswordClick}>Forgot Password?</button>
-        </LinkText>
-        <LinkText>
-          Don't have an account?{" "}
-          <a href="#" onClick={handleRegisterClick}>
-            Register
-          </a>
-        </LinkText>
-      </FormWrapper>
+      <Title>Login</Title>
+      <Form onSubmit={handleSubmit}>
+        <Input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <Input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? "Logging in..." : "Login"}
+        </Button>
+      </Form>
+      <LinkText onClick={handleForgotPasswordClick}>Forgot Password?</LinkText>
+      <LinkText onClick={() => toast.info("Register feature coming soon!")}>Don’t have an account? Register here.</LinkText>
     </Container>
   );
 };

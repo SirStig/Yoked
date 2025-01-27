@@ -23,27 +23,30 @@ class SessionValidationMiddleware(BaseHTTPMiddleware):
             "/api/subscriptions/version",
             "/api/admin/create",
             "/api/admin/login",
+            "/api/admin/mfa/setup",
+            "/api/admin/mfa/verify",
         ]
 
-        # Check if the route is in the list of public routes
+        logger.debug(f"Processing request to: {request.url.path}")
+
         if any(request.url.path.startswith(route) for route in PUBLIC_ROUTES):
             return await call_next(request)
 
-        # Proceed with session validation for other routes
         if request.url.path.startswith("/api/") and "auth" not in request.url.path:
             try:
-                # Retrieve the Authorization header
                 auth_header = request.headers.get("Authorization")
                 logger.debug(f"Authorization Header: {auth_header}")
 
                 if auth_header and auth_header.startswith("Bearer "):
-                    # Extract the token from the header
                     token = auth_header.split(" ")[1]
                     logger.debug(f"Extracted Token: {token}")
 
-                    # Manually retrieve a database session using async-safe way
-                    async with get_db() as db:
-                        await validate_session(token, db)  # Ensure this is awaited
+                    db = next(get_db())
+                    try:
+                        session = validate_session(token, db)
+                        request.state.session = session
+                    finally:
+                        db.close()
                 else:
                     return JSONResponse(
                         {"detail": "Unauthorized: Missing or invalid token"},

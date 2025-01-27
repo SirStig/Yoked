@@ -3,6 +3,14 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import styled from "styled-components";
 import { AuthContext } from "../contexts/AuthContext";
+import axios from "axios";
+
+const apiClient = axios.create({
+  baseURL: "http://127.0.0.1:8000/api/auth",
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
 // Styled Components
 const Container = styled.div`
@@ -109,7 +117,7 @@ const Verification = () => {
 
   const handleResendEmail = async () => {
     try {
-      const response = await fetch("/api/auth/resend-verification", {
+      const response = await apiClient.get("/resend-verification", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,

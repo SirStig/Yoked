@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import styled from "styled-components";
 import authProvider from "../authProvider";
-import MFASetup from "../../components/shared/MFASetup";
-import MFAVerify from "../../components/shared/MFAVerify";
+import MFASetup from "../components/MFASetup";
+import MFAVerify from "../components/MFAVerify";
+
+
 
 // Styled Components
 const Container = styled.div`
@@ -56,43 +58,41 @@ const AdminLogin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [userId, setUserId] = useState(null);
-  const [sessionToken, setSessionToken] = useState(null);
   const [mfaSetupRequired, setMfaSetupRequired] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+const [sessionToken, setSessionToken] = useState(null);
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
+      e.preventDefault();
+      setIsLoading(true);
 
-    try {
+      try {
+          const response = await authProvider.login({
+              username: email,
+              password: password,
+          });
 
-      const response = await authProvider.login({
-        username: email,
-        password: password,
-      });
-
-      if (response.mfa_setup_required) {
-        setUserId(response.user_id);
-        setMfaSetupRequired(true);
-        toast.info("MFA setup is required. Please complete the setup.");
-      } else if (response.mfa_required) {
-        setSessionToken(response.session_token);
-        setMfaRequired(true);
-        toast.info("MFA verification required. Please enter your code.");
-      } else if (response.success) {
-        toast.success("Login successful!");
-        navigate("/admin/dashboard");
-      } else {
-        throw new Error(response.message || "Login failed.");
+          if (response.mfa_required) {
+              setUserId(response.user_id);
+              setSessionToken(response.session_token);
+              setMfaRequired(true);
+              toast.info("MFA verification required. Please enter your code.");
+          } else if (response.success) {
+              toast.success("Login successful!");
+              navigate("/admin");
+          } else {
+              throw new Error(response.message || "Login failed.");
+          }
+      } catch (error) {
+          toast.error(error.message || "An error occurred during login.");
+      } finally {
+          setIsLoading(false);
       }
-    } catch (error) {
-      toast.error(error.message || "An error occurred during login.");
-    } finally {
-      setIsLoading(false);
-    }
   };
+
 
   // Conditionally render MFA components
   if (mfaSetupRequired) {
@@ -100,7 +100,7 @@ const AdminLogin = () => {
   }
 
   if (mfaRequired) {
-    return <MFAVerify sessionToken={sessionToken} />;
+    return <MFAVerify userId={userId} sessionToken={sessionToken} />;
   }
 
   return (

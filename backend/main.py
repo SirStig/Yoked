@@ -56,9 +56,26 @@ async def db_session_middleware(request: Request, call_next):
     response = await call_next(request)
     return response
 
-app.add_middleware(AdminValidationMiddleware)
+# Middleware: Session Validation
+try:
+    app.add_middleware(SessionValidationMiddleware)
+    logger.info("Session validation middleware added.")
+except Exception as e:
+    logger.error(f"Failed to add session middleware: {e}")
 
-app.add_middleware(MFAMiddleware)
+# Middleware: MFA Validation
+try:
+    app.add_middleware(MFAMiddleware)
+    logger.info("MFA validation middleware added.")
+except Exception as e:
+    logger.error(f"Failed to add mfa middleware: {e}")
+
+# Middleware: Admin Validation
+try:
+    app.add_middleware(AdminValidationMiddleware)
+    logger.info("Admin validation middleware added.")
+except Exception as e:
+    logger.error(f"Failed to add admin middleware: {e}")
 
 # Configure CORS Middleware
 app.add_middleware(
@@ -70,13 +87,6 @@ app.add_middleware(
 )
 
 logger.info(f"CORS middleware configured with origins: {allowed_origins}")
-
-# Middleware: Session Validation
-try:
-    app.add_middleware(SessionValidationMiddleware)
-    logger.info("Session validation middleware added.")
-except Exception as e:
-    logger.error(f"Failed to add session middleware: {e}")
 
 # Static files for frontend
 try:

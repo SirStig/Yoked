@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from backend.core.database import Base
 import uuid
+from backend.models.session import SessionModel
 
 # Enum for activity level
 from enum import Enum as PyEnum
@@ -71,12 +72,16 @@ class User(Base):
     accepted_terms_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     accepted_privacy_policy_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    #MFA
+    # MFA
     mfa_enabled = Column(Boolean, default=False)
     mfa_secret = Column(String, nullable=True)
     mfa_backup_codes = Column(ARRAY(String), nullable=True)
 
-    sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
+    # New notification preferences
+    email_notifications = Column(Boolean, default=True, nullable=False)
+    push_notifications = Column(Boolean, default=True, nullable=False)
+
+    sessions = relationship("SessionModel", back_populates="user", cascade="all, delete-orphan")
 
     friends = relationship(
         "User",

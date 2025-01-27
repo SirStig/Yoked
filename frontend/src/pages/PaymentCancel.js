@@ -9,13 +9,14 @@ const Container = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+  height: 100%;
   text-align: center;
 `;
 
 const Message = styled.h1`
   font-size: 2rem;
   color: red;
+  margin-bottom: 1rem;
 `;
 
 const Button = styled.button`
@@ -25,7 +26,7 @@ const Button = styled.button`
   border: none;
   border-radius: ${({ theme }) => theme.borderRadius};
   cursor: pointer;
-  margin-top: 20px;
+  transition: background-color 0.3s;
 
   &:hover {
     background-color: ${({ theme }) => theme.colors.primaryHover};
@@ -38,7 +39,7 @@ const PaymentCancel = () => {
   const sessionId = searchParams.get("session_id");
 
   const handleRetry = () => {
-    navigate("/choose-subscription"); // Updated route
+    navigate("/dashboard", { state: { overlay: "subscriptionSelection" } }); // Updated to use overlay logic
   };
 
   React.useEffect(() => {
