@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/Fitness Foundry.iml" filepath="$PROJECT_DIR$/.idea/Fitness Foundry.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/project-yoked.iml" filepath="$PROJECT_DIR$/.idea/project-yoked.iml" />
     </modules>
   </component>
 </project>
