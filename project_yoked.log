@@ -2434,3 +2434,103 @@ fastapi.exceptions.HTTPException: 404: User not found
 2025-01-28 13:04:46,364 [DEBUG] [backend.api.middlewares.mfa_middleware] Processing request to: /profile
 2025-01-28 13:04:46,364 [WARNING] [backend.api.middlewares.mfa_middleware] Missing or malformed Authorization header
 2025-01-28 13:04:46,366 [INFO] [httpx] HTTP Request: GET http://testserver/profile "HTTP/1.1 401 Unauthorized"
+2025-01-28 13:13:13,964 [DEBUG] [passlib.registry] registered 'bcrypt' handler: <class 'passlib.handlers.bcrypt.bcrypt'>
+2025-01-28 13:13:15,319 [INFO] [backend.main] Session validation middleware added.
+2025-01-28 13:13:15,319 [INFO] [backend.main] MFA validation middleware added.
+2025-01-28 13:13:15,319 [INFO] [backend.main] Admin validation middleware added.
+2025-01-28 13:13:15,319 [INFO] [backend.main] CORS middleware configured with origins: ['http://localhost:3000']
+2025-01-28 13:13:15,320 [ERROR] [backend.main] Failed to mount static files: Directory '../frontend/build' does not exist
+2025-01-28 13:13:15,323 [INFO] [backend.main] Auth router registered.
+2025-01-28 13:13:15,327 [INFO] [backend.main] User router registered.
+2025-01-28 13:13:15,329 [INFO] [backend.main] Workout router registered.
+2025-01-28 13:13:15,337 [INFO] [backend.main] Payment router registered.
+2025-01-28 13:13:15,342 [INFO] [backend.main] Subscription router registered.
+2025-01-28 13:13:15,343 [INFO] [backend.main] Stripe Webhook router registered.
+2025-01-28 13:13:15,345 [INFO] [backend.main] Admin router registered.
+2025-01-28 13:15:40,877 [DEBUG] [passlib.registry] registered 'bcrypt' handler: <class 'passlib.handlers.bcrypt.bcrypt'>
+2025-01-28 13:15:42,239 [INFO] [backend.main] Session validation middleware added.
+2025-01-28 13:15:42,239 [INFO] [backend.main] MFA validation middleware added.
+2025-01-28 13:15:42,239 [INFO] [backend.main] Admin validation middleware added.
+2025-01-28 13:15:42,239 [INFO] [backend.main] CORS middleware configured with origins: ['http://localhost:3000']
+2025-01-28 13:15:42,240 [ERROR] [backend.main] Failed to mount static files: Directory '../frontend/build' does not exist
+2025-01-28 13:15:42,244 [INFO] [backend.main] Auth router registered.
+2025-01-28 13:15:42,249 [INFO] [backend.main] User router registered.
+2025-01-28 13:15:42,251 [INFO] [backend.main] Workout router registered.
+2025-01-28 13:15:42,259 [INFO] [backend.main] Payment router registered.
+2025-01-28 13:15:42,263 [INFO] [backend.main] Subscription router registered.
+2025-01-28 13:15:42,264 [INFO] [backend.main] Stripe Webhook router registered.
+2025-01-28 13:15:42,266 [INFO] [backend.main] Admin router registered.
+2025-01-28 13:15:42,428 [DEBUG] [asyncio] Using proactor: IocpProactor
+2025-01-28 13:15:42,430 [DEBUG] [backend.api.middlewares.admin_middleware] Processing request to: /profile
+2025-01-28 13:15:42,430 [DEBUG] [backend.api.middlewares.mfa_middleware] Processing request to: /profile
+2025-01-28 13:15:42,430 [WARNING] [backend.api.middlewares.mfa_middleware] Missing or malformed Authorization header
+2025-01-28 13:15:42,431 [INFO] [httpx] HTTP Request: GET http://testserver/profile "HTTP/1.1 401 Unauthorized"
+2025-01-28 13:19:54,803 [DEBUG] [passlib.registry] registered 'bcrypt' handler: <class 'passlib.handlers.bcrypt.bcrypt'>
+2025-01-28 13:19:56,184 [INFO] [backend.main] Session validation middleware added.
+2025-01-28 13:19:56,184 [INFO] [backend.main] MFA validation middleware added.
+2025-01-28 13:19:56,184 [INFO] [backend.main] Admin validation middleware added.
+2025-01-28 13:19:56,184 [INFO] [backend.main] CORS middleware configured with origins: ['http://localhost:3000']
+2025-01-28 13:19:56,184 [ERROR] [backend.main] Failed to mount static files: Directory '../frontend/build' does not exist
+2025-01-28 13:19:56,187 [INFO] [backend.main] Auth router registered.
+2025-01-28 13:19:56,192 [INFO] [backend.main] User router registered.
+2025-01-28 13:19:56,195 [INFO] [backend.main] Workout router registered.
+2025-01-28 13:19:56,202 [INFO] [backend.main] Payment router registered.
+2025-01-28 13:19:56,208 [INFO] [backend.main] Subscription router registered.
+2025-01-28 13:19:56,208 [INFO] [backend.main] Stripe Webhook router registered.
+2025-01-28 13:19:56,210 [INFO] [backend.main] Admin router registered.
+2025-01-28 13:19:56,367 [DEBUG] [asyncio] Using proactor: IocpProactor
+2025-01-28 13:19:56,368 [DEBUG] [backend.api.middlewares.admin_middleware] Processing request to: /profile
+2025-01-28 13:19:56,368 [DEBUG] [backend.api.middlewares.mfa_middleware] Processing request to: /profile
+2025-01-28 13:19:56,368 [WARNING] [backend.api.middlewares.mfa_middleware] Missing or malformed Authorization header
+2025-01-28 13:19:56,369 [INFO] [httpx] HTTP Request: GET http://testserver/profile "HTTP/1.1 401 Unauthorized"
+2025-01-28 13:25:19,420 [DEBUG] [passlib.registry] registered 'bcrypt' handler: <class 'passlib.handlers.bcrypt.bcrypt'>
+2025-01-28 13:25:20,767 [INFO] [backend.main] Session validation middleware added.
+2025-01-28 13:25:20,767 [INFO] [backend.main] MFA validation middleware added.
+2025-01-28 13:25:20,767 [INFO] [backend.main] Admin validation middleware added.
+2025-01-28 13:25:20,767 [INFO] [backend.main] CORS middleware configured with origins: ['http://localhost:3000']
+2025-01-28 13:25:20,767 [ERROR] [backend.main] Failed to mount static files: Directory '../frontend/build' does not exist
+2025-01-28 13:25:20,771 [INFO] [backend.main] Auth router registered.
+2025-01-28 13:25:20,775 [INFO] [backend.main] User router registered.
+2025-01-28 13:25:20,778 [INFO] [backend.main] Workout router registered.
+2025-01-28 13:25:20,785 [INFO] [backend.main] Payment router registered.
+2025-01-28 13:25:20,791 [INFO] [backend.main] Subscription router registered.
+2025-01-28 13:25:20,791 [INFO] [backend.main] Stripe Webhook router registered.
+2025-01-28 13:25:20,794 [INFO] [backend.main] Admin router registered.
+2025-01-28 13:25:20,954 [DEBUG] [asyncio] Using proactor: IocpProactor
+2025-01-28 13:25:20,955 [DEBUG] [backend.api.middlewares.admin_middleware] Processing request to: /profile
+2025-01-28 13:25:20,956 [DEBUG] [backend.api.middlewares.mfa_middleware] Processing request to: /profile
+2025-01-28 13:25:20,956 [WARNING] [backend.api.middlewares.mfa_middleware] Missing or malformed Authorization header
+2025-01-28 13:25:20,957 [INFO] [httpx] HTTP Request: GET http://testserver/profile "HTTP/1.1 401 Unauthorized"
+2025-01-28 13:31:44,038 [DEBUG] [passlib.registry] registered 'bcrypt' handler: <class 'passlib.handlers.bcrypt.bcrypt'>
+2025-01-28 13:31:45,393 [INFO] [backend.main] Session validation middleware added.
+2025-01-28 13:31:45,393 [INFO] [backend.main] MFA validation middleware added.
+2025-01-28 13:31:45,393 [INFO] [backend.main] Admin validation middleware added.
+2025-01-28 13:31:45,393 [INFO] [backend.main] CORS middleware configured with origins: ['http://localhost:3000']
+2025-01-28 13:31:45,394 [ERROR] [backend.main] Failed to mount static files: Directory '../frontend/build' does not exist
+2025-01-28 13:31:45,397 [INFO] [backend.main] Auth router registered.
+2025-01-28 13:31:45,402 [INFO] [backend.main] User router registered.
+2025-01-28 13:31:45,405 [INFO] [backend.main] Workout router registered.
+2025-01-28 13:31:45,412 [INFO] [backend.main] Payment router registered.
+2025-01-28 13:31:45,417 [INFO] [backend.main] Subscription router registered.
+2025-01-28 13:31:45,417 [INFO] [backend.main] Stripe Webhook router registered.
+2025-01-28 13:31:45,420 [INFO] [backend.main] Admin router registered.
+2025-01-28 13:31:45,577 [DEBUG] [asyncio] Using proactor: IocpProactor
+2025-01-28 13:31:45,580 [DEBUG] [backend.api.middlewares.admin_middleware] Processing request to: /profile
+2025-01-28 13:31:45,580 [DEBUG] [backend.api.middlewares.mfa_middleware] Processing request to: /profile
+2025-01-28 13:31:45,580 [WARNING] [backend.api.middlewares.mfa_middleware] Missing or malformed Authorization header
+2025-01-28 13:31:45,581 [INFO] [httpx] HTTP Request: GET http://testserver/profile "HTTP/1.1 401 Unauthorized"
+2025-01-28 13:31:45,878 [DEBUG] [asyncio] Using proactor: IocpProactor
+2025-01-28 13:31:45,879 [DEBUG] [backend.api.middlewares.admin_middleware] Processing request to: /profile
+2025-01-28 13:31:45,879 [DEBUG] [backend.api.middlewares.mfa_middleware] Processing request to: /profile
+2025-01-28 13:31:45,879 [WARNING] [backend.api.middlewares.mfa_middleware] Missing or malformed Authorization header
+2025-01-28 13:31:45,880 [INFO] [httpx] HTTP Request: PUT http://testserver/profile "HTTP/1.1 401 Unauthorized"
+2025-01-28 13:31:45,886 [DEBUG] [asyncio] Using proactor: IocpProactor
+2025-01-28 13:31:45,887 [DEBUG] [backend.api.middlewares.admin_middleware] Processing request to: /deactivate
+2025-01-28 13:31:45,888 [DEBUG] [backend.api.middlewares.mfa_middleware] Processing request to: /deactivate
+2025-01-28 13:31:45,888 [WARNING] [backend.api.middlewares.mfa_middleware] Missing or malformed Authorization header
+2025-01-28 13:31:45,888 [INFO] [httpx] HTTP Request: PUT http://testserver/deactivate "HTTP/1.1 401 Unauthorized"
+2025-01-28 13:31:45,900 [DEBUG] [asyncio] Using proactor: IocpProactor
+2025-01-28 13:31:45,902 [DEBUG] [backend.api.middlewares.admin_middleware] Processing request to: /reactivate
+2025-01-28 13:31:45,902 [DEBUG] [backend.api.middlewares.mfa_middleware] Processing request to: /reactivate
+2025-01-28 13:31:45,902 [WARNING] [backend.api.middlewares.mfa_middleware] Missing or malformed Authorization header
+2025-01-28 13:31:45,903 [INFO] [httpx] HTTP Request: PUT http://testserver/reactivate?user_id=14d14bef-ffbf-45a6-9364-ad8610c98c90 "HTTP/1.1 401 Unauthorized"

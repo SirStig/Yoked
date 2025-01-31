@@ -1,9 +1,11 @@
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ARRAY
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ARRAY, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 import uuid
-from backend.core.database import Base
 
+from sqlalchemy.orm import relationship
+
+from backend.core.database import Base
 
 class SubscriptionTier(Base):
     __tablename__ = "subscription_tiers"
@@ -14,7 +16,7 @@ class SubscriptionTier(Base):
     features = Column(ARRAY(String), nullable=True)
     is_active = Column(Boolean, default=False)
     currency = Column(String, nullable=False, default="USD")
-    recurring_interval = Column(String, nullable=False, default="monthly")
+    recurring_interval = Column(String, nullable=False, default="monthly")  # Can be "monthly" or "yearly"
 
     # Capability flags
     has_ads = Column(Boolean, default=True)
@@ -41,14 +43,19 @@ class SubscriptionTier(Base):
     one_on_one_coaching = Column(Boolean, default=False)
 
     priority_support = Column(Boolean, default=False)
+
+    # Hide tier from new users but keep it for existing subscribers
     is_hidden = Column(Boolean, default=False)
+
+    # Free trial settings
     is_trial_available = Column(Boolean, default=False)
     trial_period_days = Column(Integer, default=0)
 
-    billing_cycle = Column(String, default="monthly")  # monthly, yearly, etc.
+    # Billing and cancellation policies
+    billing_cycle = Column(String, default="monthly")  # Can be "monthly" or "yearly"
     cancellation_policy = Column(String, default="Cancel anytime")
 
-    # Usage restrictions
+    # Usage Restrictions
     max_reel_uploads = Column(Integer, default=0)
     max_saved_workouts = Column(Integer, default=0)
     max_messages_per_day = Column(Integer, default=0)
@@ -58,3 +65,19 @@ class SubscriptionTier(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Linking subscriptions to users
+class UserSubscription(Base):
+    __tablename__ = "user_subscriptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    subscription_tier_id = Column(UUID(as_uuid=True), ForeignKey("subscription_tiers.id"), nullable=False)
+    status = Column(String, default="active")  # Can be "active", "canceled", "expired"
+    start_date = Column(DateTime, default=datetime.utcnow, nullable=False)
+    end_date = Column(DateTime, nullable=True)
+    renewal_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="subscriptions")

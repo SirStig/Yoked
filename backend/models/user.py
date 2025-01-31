@@ -3,10 +3,13 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from backend.core.database import Base
 import uuid
-from backend.models.session import SessionModel
-
-# Enum for activity level
 from enum import Enum as PyEnum
+
+from backend.models.community_post import post_likes, post_bookmarks
+from backend.models.private_messaging import group_chat_participants
+from backend.models.reels import reel_likes, reel_bookmarks
+from backend.models.workout import workout_bookmarks
+from backend.models.nutrition import saved_meal_plans
 
 
 class ActivityLevel(PyEnum):
@@ -25,12 +28,21 @@ class UserType(PyEnum):
     REGULAR = "regular"
     ADMIN = "admin"
 
-# Association table for friends
-user_friends = Table(
-    "user_friends",
+# Association table for followers
+user_followers = Table(
+    "user_followers",
     Base.metadata,
     Column("user_id", UUID, ForeignKey("users.id"), primary_key=True),
-    Column("friend_id", UUID, ForeignKey("users.id"), primary_key=True),
+    Column("follower_id", UUID, ForeignKey("users.id"), primary_key=True),
+)
+
+# Association table for friend requests
+friend_requests = Table(
+    "friend_requests",
+    Base.metadata,
+    Column("sender_id", UUID, ForeignKey("users.id"), primary_key=True),
+    Column("receiver_id", UUID, ForeignKey("users.id"), primary_key=True),
+    Column("status", String, default="pending", nullable=False),
 )
 
 class User(Base):
@@ -53,20 +65,19 @@ class User(Base):
     admin_secret_key = Column(String, nullable=True)
     flagged_for_review = Column(Boolean, default=False)
 
-    # New fields
+    # Additional Fields
     age = Column(Integer, nullable=True)
     gender = Column(String, nullable=True)
     activity_level = Column(Enum(ActivityLevel), nullable=True)
-
     height = Column(String, nullable=True)
     weight = Column(String, nullable=True)
     height_unit = Column(String, default="ft/in")
     weight_unit = Column(String, default="lbs")
 
-    # Versioning for profile changes
+    # Versioning
     profile_version = Column(Integer, nullable=False, default=1)
 
-    # Privacy fields
+    # Privacy settings
     accepted_terms = Column(Boolean, nullable=False)
     accepted_privacy_policy = Column(Boolean, nullable=False)
     accepted_terms_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -77,30 +88,44 @@ class User(Base):
     mfa_secret = Column(String, nullable=True)
     mfa_backup_codes = Column(ARRAY(String), nullable=True)
 
-    # New notification preferences
+    # Notification Preferences
     email_notifications = Column(Boolean, default=True, nullable=False)
     push_notifications = Column(Boolean, default=True, nullable=False)
 
+    # Relationships
     sessions = relationship("SessionModel", back_populates="user", cascade="all, delete-orphan")
-
-    friends = relationship(
-        "User",
-        secondary=user_friends,
-        primaryjoin=id == user_friends.c.user_id,
-        secondaryjoin=id == user_friends.c.friend_id,
-        backref="friend_of",
-    )
-    progress_photos = relationship(
-        "ProgressPhoto",
+    followers = relationship("User", secondary=user_followers, primaryjoin=id == user_followers.c.user_id, secondaryjoin=id == user_followers.c.follower_id, backref="following")
+    friend_requests_sent = relationship("User", secondary=friend_requests, primaryjoin=id == friend_requests.c.sender_id, secondaryjoin=id == friend_requests.c.receiver_id, backref="friend_requests_received")
+    progress_photos = relationship("ProgressPhoto", back_populates="user", cascade="all, delete-orphan")
+    payments = relationship("Payment", back_populates="user", cascade="all, delete-orphan")
+    subscriptions = relationship(
+        "UserSubscription",
         back_populates="user",
         cascade="all, delete-orphan"
     )
+    posts = relationship("Post", back_populates="author", cascade="all, delete-orphan")
+    liked_posts = relationship("Post", secondary=post_likes, back_populates="likes")
+    bookmarked_posts = relationship("Post", secondary=post_bookmarks, back_populates="bookmarks")
+    comments = relationship("Comment", back_populates="author", cascade="all, delete-orphan")
+    reported_posts = relationship("ReportedPost", back_populates="reporter", cascade="all, delete-orphan")
+    reels = relationship("Reel", back_populates="author", cascade="all, delete-orphan")
+    liked_reels = relationship("Reel", secondary=reel_likes, back_populates="likes")
+    bookmarked_reels = relationship("Reel", secondary=reel_bookmarks, back_populates="bookmarks")
+    reel_comments = relationship("ReelComment", back_populates="author", cascade="all, delete-orphan")
+    reported_reels = relationship("ReportedReel", back_populates="reporter", cascade="all, delete-orphan")
+    bookmarked_workouts = relationship("Workout", secondary=workout_bookmarks, back_populates="bookmarks")
+    workout_history = relationship("WorkoutProgress", back_populates="user", cascade="all, delete-orphan")
+    nutrition_articles = relationship("NutritionArticle", back_populates="author", cascade="all, delete-orphan")
+    saved_meal_plans = relationship("MealPlan", secondary=saved_meal_plans, back_populates="users_saved")
+    meal_tracking = relationship("UserMealTracking", back_populates="user", cascade="all, delete-orphan")
+    chats = relationship("Chat", secondary=group_chat_participants, back_populates="participants")
+    messages_sent = relationship("Message", back_populates="sender", cascade="all, delete-orphan")
+    typing_status = relationship("TypingStatus", back_populates="user", cascade="all, delete-orphan")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    achievements = relationship("UserAchievement", back_populates="user", cascade="all, delete-orphan")
+    level = relationship("UserLevel", back_populates="user", cascade="all, delete-orphan")
+    leaderboard = relationship("Leaderboard", back_populates="user", cascade="all, delete-orphan")
 
-    payments = relationship(
-        "Payment",
-        back_populates="user",
-        cascade="all, delete-orphan",
-    )
 
 class ProgressPhoto(Base):
     __tablename__ = "progress_photos"
