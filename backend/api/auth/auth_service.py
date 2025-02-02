@@ -1,189 +1,201 @@
-from datetime import datetime, timedelta
-from fastapi import HTTPException, Depends, Header
-from jose import jwt, JWTError
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy.orm import Session
-from backend.core.database import get_db
+from fastapi import HTTPException, Depends
+from uuid import UUID
+from datetime import datetime
+
+from backend.models import User
+from backend.schemas.user_schema import UserCreate, UserType
+from backend.services.session_service import create_session
+from backend.services.mfa import generate_mfa_secret
 from backend.core.logging_config import get_logger
-from backend.models.user import User
-from backend.services.session_service import (
-    create_session,
-    validate_session,
-    invalidate_session,
-    invalidate_specific_session,
-)
-from backend.core.config import settings
-from backend.schemas.user_schema import UserCreate, UserType, SetupStep
 
 logger = get_logger(__name__)
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# JWT settings
-SECRET_KEY = settings.SECRET_KEY
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-
 def hash_password(password: str) -> str:
+    """ Securely hashes a password using bcrypt. """
     try:
-        return pwd_context.hash(password)
+        return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     except Exception as e:
         logger.exception("Error hashing password")
-        raise HTTPException(status_code=500, detail="Error hashing password")
-
+        raise HTTPException(status_code=500, detail="Password hashing failed")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """ Verifies a password against a stored hash. """
     try:
-        return pwd_context.verify(plain_password, hashed_password)
+        return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
     except Exception as e:
         logger.exception("Error verifying password")
-        return False
+        raise HTTPException(status_code=500, detail="Password verification failed")
 
-
-def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
+def create_user(db: Session, user_data: UserCreate) -> User:
+    """ Creates a new user in the database. """
     try:
-        to_encode = data.copy()
-        expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-        to_encode.update({"exp": expire})
-        return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    except Exception as e:
-        logger.exception("Error creating access token")
-        raise HTTPException(status_code=500, detail="Token generation failed")
+        logger.info(f"Creating new user: {user_data.username}")
 
+        if db.query(User).filter(User.email == user_data.email).first():
+            raise HTTPException(status_code=400, detail="Email already registered")
 
-def get_user_by_username(db: Session, username: str) -> User:
-    try:
-        return db.query(User).filter(User.username == username).first()
-    except Exception as e:
-        logger.exception("Error fetching user by username")
-        raise HTTPException(status_code=500, detail="Error fetching user by username")
+        if db.query(User).filter(User.username == user_data.username).first():
+            raise HTTPException(status_code=400, detail="Username already taken")
 
-
-def get_user_by_email(db: Session, email: str) -> User:
-    try:
-        return db.query(User).filter(User.email == email).first()
-    except Exception as e:
-        logger.exception("Error fetching user by email")
-        raise HTTPException(status_code=500, detail="Error fetching user by email")
-
-
-def create_user(db: Session, user: UserCreate) -> User:
-    try:
-        if get_user_by_username(db, user.username):
-            raise HTTPException(status_code=400, detail={"code": "username_exists", "detail": "Username already taken"})
-        if get_user_by_email(db, user.email):
-            raise HTTPException(status_code=400, detail={"code": "email_exists", "detail": "Email already registered"})
-
-        hashed_password = hash_password(user.hashed_password)
-
-        # Exclude admin_secret_key for regular users
-        if user.user_type == UserType.ADMIN and not user.admin_secret_key:
-            raise HTTPException(status_code=403, detail="Admin secret key is required for admin users")
+        hashed_pw = hash_password(user_data.password)
 
         new_user = User(
-            full_name=user.full_name,
-            username=user.username,
-            email=user.email,
-            hashed_password=hashed_password,
+            username=user_data.username,
+            email=user_data.email,
+            hashed_password=hashed_pw,
+            full_name=user_data.full_name,
+            bio=user_data.bio,
+            profile_picture=user_data.profile_picture,
+            fitness_goals=user_data.fitness_goals,
+            accepted_terms=user_data.accepted_terms,
+            accepted_privacy_policy=user_data.accepted_privacy_policy,
+            subscription_plan=user_data.subscription_plan,
+            setup_step=user_data.setup_step,
+            user_type=user_data.user_type,
             is_active=True,
             is_verified=False,
-            bio=user.bio,
-            profile_picture=user.profile_picture,
-            fitness_goals=user.fitness_goals,
-            subscription_plan="Free",
-            setup_step="email_verification",
+            activity_level=user_data.activity_level,
+            height=user_data.height,
+            weight=user_data.weight,
+            height_unit=user_data.height_unit,
+            weight_unit=user_data.weight_unit,
+            profile_version=user_data.profile_version,
+            flagged_for_review=False,
             joined_at=datetime.utcnow(),
-            accepted_terms=user.accepted_terms,
-            accepted_privacy_policy=user.accepted_privacy_policy,
-            accepted_terms_at=datetime.utcnow(),
-            accepted_privacy_policy_at=datetime.utcnow(),
-            profile_version=1,
-            admin_secret_key="",
+            accepted_terms_at=datetime.utcnow() if user_data.accepted_terms else None,
+            accepted_privacy_policy_at=datetime.utcnow() if user_data.accepted_privacy_policy else None,
+            age=user_data.age,
+            gender=user_data.gender,
+            email_notifications=user_data.email_notifications,
+            push_notifications=user_data.push_notifications,
         )
 
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        logger.info(f"User created: ID={new_user.id}, username={new_user.username}")
+
+        logger.info(f"User created successfully: {new_user.id}")
         return new_user
+
     except HTTPException as e:
+        logger.error(f"User creation failed: {e.detail}")
         raise e
     except Exception as e:
-        logger.exception("Error creating user")
-        raise HTTPException(status_code=500, detail="User creation failed")
+        logger.exception("Unexpected error during user creation")
+        raise HTTPException(status_code=500, detail="User registration failed. Please try again.")
 
-
-
-def authenticate_user(username: str, password: str, db: Session) -> User:
+def get_user_by_email(db: Session, email: str) -> User:
+    """ Retrieves a user by email. """
     try:
-        user = get_user_by_username(db, username)
-        if not user or not verify_password(password, user.hashed_password):
-            logger.warning(f"Authentication failed for username: {username}")
-            raise HTTPException(
-                status_code=401, detail={"code": "invalid_credentials", "detail": "Invalid username or password"}
-            )
-        if not user.is_verified:
-            logger.warning(f"Unverified email login attempt: {username}")
-            raise HTTPException(
-                status_code=403, detail={"code": "email_not_verified", "detail": "Email not verified"}
-            )
-        return user
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        logger.exception("Authentication error")
-        raise HTTPException(status_code=500, detail="Authentication failed")
-
-
-def get_current_user(
-    token: str = Header(..., alias="Authorization"), db: Session = Depends(get_db)
-) -> User:
-    try:
-        if token.startswith("Bearer "):
-            token = token.split(" ")[1]
-        else:
-            raise HTTPException(status_code=401, detail="Invalid token format")
-
-        session = validate_session(token, db)
-        user = db.query(User).filter(User.id == session.user_id).first()
+        user = db.query(User).filter(User.email == email).first()
         if not user:
+            logger.warning(f"User not found for email: {email}")
+        return user
+    except Exception as e:
+        logger.exception("Error retrieving user by email")
+        raise HTTPException(status_code=500, detail="Failed to retrieve user")
+
+def get_user_by_username(db: Session, username: str) -> User:
+    """ Retrieves a user by username. """
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            logger.warning(f"User not found for username: {username}")
+        return user
+    except Exception as e:
+        logger.exception("Error retrieving user by username")
+        raise HTTPException(status_code=500, detail="Failed to retrieve user")
+
+def get_current_user(db: Session, user_id: UUID) -> User:
+    """ Retrieves the currently authenticated user. """
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            logger.warning(f"User not found: {user_id}")
             raise HTTPException(status_code=404, detail="User not found")
         return user
-    except JWTError:
-        logger.exception("Invalid JWT token")
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
     except Exception as e:
-        logger.exception("Error fetching current user")
-        raise HTTPException(status_code=500, detail="Failed to fetch user")
+        logger.exception("Error retrieving current user")
+        raise HTTPException(status_code=500, detail="Failed to retrieve user")
 
+def update_last_login(user: User, db: Session):
+    """ Updates the last login timestamp for a user. """
+    try:
+        user.last_login = datetime.utcnow()
+        db.commit()
+        logger.info(f"Updated last login for user: {user.id}")
+    except Exception as e:
+        logger.exception("Error updating last login")
+        raise HTTPException(status_code=500, detail="Failed to update last login")
 
-def admin_required(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> User:
-    if not current_user.is_active:
-        raise HTTPException(status_code=403, detail="Inactive user")
+def enable_mfa(user: User, db: Session):
+    """ Enables MFA for a user and generates a secret. """
+    try:
+        mfa_data = generate_mfa_secret(user.email)
+        user.mfa_secret = mfa_data["mfa_secret"]
+        user.mfa_enabled = True
+        db.commit()
+        return {"message": "MFA enabled", "qr_code": mfa_data["qr_code"], "manual_key": mfa_data["manual_key"]}
+    except Exception as e:
+        logger.exception(f"Error enabling MFA: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to enable MFA")
+
+def disable_mfa(user: User, db: Session):
+    """ Disables MFA for a user. """
+    try:
+        user.mfa_secret = None
+        user.mfa_enabled = False
+        db.commit()
+        return {"message": "MFA disabled successfully"}
+    except Exception as e:
+        logger.exception(f"Error disabling MFA: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to disable MFA")
+
+def generate_password_reset_token(user_id: UUID) -> str:
+    """ Generates a password reset token for the user. """
+    import jwt
+    from backend.core.config import settings
+
+    try:
+        token_data = {
+            "sub": str(user_id),
+            "exp": datetime.utcnow() + settings.PASSWORD_RESET_EXPIRATION,
+        }
+        token = jwt.encode(token_data, settings.SECRET_KEY, algorithm="HS256")
+        logger.info(f"Generated password reset token for user: {user_id}")
+        return token
+    except Exception as e:
+        logger.exception("Error generating password reset token")
+        raise HTTPException(status_code=500, detail="Failed to generate password reset token")
+
+def update_password(user_id: UUID, new_password: str, db: Session):
+    """ Updates a user's password. """
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user.hashed_password = hash_password(new_password)
+        db.commit()
+        logger.info(f"Password updated for user: {user.id}")
+    except Exception as e:
+        logger.exception("Error updating password")
+        raise HTTPException(status_code=500, detail="Failed to update password")
+
+def create_user_session(user: User, db: Session, is_mobile: bool = False):
+    """ Creates a session for a user upon login. """
+    try:
+        session_token = create_session(user.id, db, is_mobile)
+        return {"access_token": session_token, "token_type": "bearer"}
+    except Exception as e:
+        logger.exception("Error creating user session")
+        raise HTTPException(status_code=500, detail="Failed to create user session")
+
+def admin_required(current_user: User = Depends(get_current_user)):
+    """ Middleware to ensure that only admins can access a route. """
     if current_user.user_type != UserType.ADMIN:
-        raise HTTPException(status_code=403, detail="Admin privileges required")
-    return current_user
-
-
-
-def logout_user(token: str, db: Session):
-    try:
-        invalidate_specific_session(token, db)
-        logger.info("User logged out successfully")
-    except Exception as e:
-        logger.exception("Error logging out user")
-        raise HTTPException(status_code=500, detail="Logout failed")
-
-
-def logout_all_sessions(user_id: int, db: Session):
-    try:
-        invalidate_session(user_id, db)
-        logger.info(f"All sessions invalidated for user ID: {user_id}")
-    except Exception as e:
-        logger.exception("Error logging out all sessions")
-        raise HTTPException(status_code=500, detail="Logout all sessions failed")
+        raise HTTPException(status_code=403, detail="Access denied. Admins only.")

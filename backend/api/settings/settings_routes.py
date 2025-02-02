@@ -1,15 +1,28 @@
+import stripe
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
 from backend.core.database import get_db
 from backend.api.auth.auth_service import get_current_user
+from backend.models import Payment, SubscriptionTier
 from backend.models.user import User
-from backend.schemas.user_schema import NotificationPreferences, UserProfileUpdate
+from backend.schemas.user_schema import (
+    NotificationPreferences,
+    UserProfileUpdate,
+    PrivacySettings,
+    SecuritySettings,
+    ThemePreferences,
+    ThirdPartyAccounts
+)
 from backend.services.mfa import reset_mfa
 from backend.core.logging_config import get_logger
-from backend.schemas.payment_schema import SubscriptionDetails, UpdateSubscription
+from backend.schemas.payment_schema import SubscriptionDetails, UpdateSubscription, RefundRequest
 from backend.services.session_service import fetch_user_sessions
 from backend.api.subscriptions.subscription_service import update_user_subscription, cancel_user_subscription
 from backend.schemas.session_schema import UserSession
+
+# Initialize Stripe API
+stripe.api_key = "your-stripe-secret-key"
 
 # Logger setup
 logger = get_logger(__name__)
@@ -17,24 +30,16 @@ logger = get_logger(__name__)
 # Router setup
 router = APIRouter(prefix="/api/settings", tags=["Settings"])
 
-
+### **Notification Settings**
 @router.get("/notifications", response_model=NotificationPreferences)
 async def get_notification_preferences(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    """
-    Fetch the current user's notification preferences.
-    """
-    logger.info(f"Fetching notification preferences for user ID {current_user.id}")
-    try:
-        return {
-            "email_notifications": current_user.email_notifications,
-            "push_notifications": current_user.push_notifications,
-        }
-    except Exception as e:
-        logger.exception(f"Error fetching notification preferences: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch notification preferences.")
-
+    """ Fetch the current user's notification preferences. """
+    return {
+        "email_notifications": current_user.email_notifications,
+        "push_notifications": current_user.push_notifications,
+    }
 
 @router.put("/notifications", response_model=dict)
 async def update_notification_preferences(
@@ -42,124 +47,118 @@ async def update_notification_preferences(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Update the user's notification preferences.
-    """
-    logger.info(f"Updating notification preferences for user ID {current_user.id}")
-    try:
-        current_user.email_notifications = preferences.email_notifications
-        current_user.push_notifications = preferences.push_notifications
-        db.commit()
+    """ Update the user's notification preferences. """
+    current_user.email_notifications = preferences.email_notifications
+    current_user.push_notifications = preferences.push_notifications
+    db.commit()
+    return {"message": "Notification preferences updated successfully."}
 
-        logger.info(f"Notification preferences updated for user ID {current_user.id}")
-        return {"message": "Notification preferences updated successfully."}
-    except Exception as e:
-        logger.exception(f"Error updating notification preferences: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to update notification preferences.")
-
-
-@router.put("/reset-mfa", response_model=dict)
-async def reset_mfa_route(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+### **Profile Settings**
+@router.put("/profile", response_model=dict)
+async def update_profile(
+    profile_data: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """
-    Reset the user's MFA setup.
-    """
-    logger.info(f"Resetting MFA for user ID {current_user.id}")
-    try:
-        reset_mfa(current_user.id, db)
-        logger.info(f"MFA reset successfully for user ID {current_user.id}")
-        return {"message": "MFA reset successfully. Please set up MFA again."}
-    except Exception as e:
-        logger.exception(f"Error resetting MFA: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to reset MFA.")
+    """ Update the user's profile information. """
+    for key, value in profile_data.dict(exclude_unset=True).items():
+        setattr(current_user, key, value)
+    db.commit()
+    return {"message": "Profile updated successfully."}
 
-
-@router.delete("/account", response_model=dict)
-async def delete_account(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+### **Privacy Settings**
+@router.put("/privacy", response_model=dict)
+async def update_privacy_settings(
+    privacy_data: PrivacySettings,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """
-    Delete the user's account.
-    """
-    logger.info(f"Deleting account for user ID {current_user.id}")
-    try:
-        db.delete(current_user)
-        db.commit()
+    """ Update the user's privacy settings. """
+    for key, value in privacy_data.dict(exclude_unset=True).items():
+        setattr(current_user, key, value)
+    db.commit()
+    return {"message": "Privacy settings updated successfully."}
 
-        logger.info(f"Account deleted for user ID {current_user.id}")
-        return {"message": "Account deleted successfully."}
-    except Exception as e:
-        logger.exception(f"Error deleting account: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to delete account.")
-
-
-@router.get("/subscription", response_model=SubscriptionDetails)
-async def get_subscription_details(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+### **Security Settings**
+@router.put("/security", response_model=dict)
+async def update_security_settings(
+    security_data: SecuritySettings,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """
-    Fetch the current user's subscription details.
-    """
-    logger.info(f"Fetching subscription details for user ID {current_user.id}")
-    try:
-        return {
-            "subscription_name": current_user.subscription_plan,
-            "price": current_user.subscription_price,
-            "status": current_user.subscription_status,
-        }
-    except Exception as e:
-        logger.exception(f"Error fetching subscription details: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch subscription details.")
+    """ Update the user's security settings. """
+    for key, value in security_data.dict(exclude_unset=True).items():
+        setattr(current_user, key, value)
+    db.commit()
+    return {"message": "Security settings updated successfully."}
 
+### **Theme & UI Preferences**
+@router.put("/theme", response_model=dict)
+async def update_theme_settings(
+    theme_data: ThemePreferences,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """ Update theme settings for dark mode, font size, etc. """
+    for key, value in theme_data.dict(exclude_unset=True).items():
+        setattr(current_user, key, value)
+    db.commit()
+    return {"message": "Theme settings updated successfully."}
 
+### **Third-Party Account Connections**
+@router.put("/third-party", response_model=dict)
+async def update_third_party_accounts(
+    account_data: ThirdPartyAccounts,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """ Update the user's connected third-party accounts. """
+    for key, value in account_data.dict(exclude_unset=True).items():
+        setattr(current_user, key, value)
+    db.commit()
+    return {"message": "Third-party accounts updated successfully."}
+
+### **Subscription Management**
 @router.put("/subscription", response_model=dict)
 async def update_subscription(
     subscription_data: UpdateSubscription,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Update the user's subscription plan.
-    """
-    logger.info(f"Updating subscription for user ID {current_user.id}")
-    try:
-        update_user_subscription(current_user.id, subscription_data, db)
-        logger.info(f"Subscription updated successfully for user ID {current_user.id}")
-        return {"message": "Subscription updated successfully."}
-    except Exception as e:
-        logger.exception(f"Error updating subscription: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to update subscription.")
+    """ Update a user's subscription via Stripe. """
+    current_subscription = stripe.Subscription.retrieve(current_user.stripe_subscription_id)
+    new_plan_id = subscription_data.new_plan_id
 
+    # Fetch new plan
+    new_plan = db.query(SubscriptionTier).filter_by(id=new_plan_id, is_active=True).first()
+    if not new_plan:
+        raise HTTPException(status_code=400, detail="Invalid subscription plan.")
 
-@router.delete("/subscription", response_model=dict)
-async def cancel_subscription(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    stripe.Subscription.modify(
+        current_subscription["id"],
+        cancel_at_period_end=False,
+        proration_behavior="create_prorations",
+        items=[{"id": current_subscription["items"]["data"][0]["id"], "price": new_plan.stripe_price_id}],
+    )
+
+    current_user.subscription_plan = new_plan.name
+    current_user.subscription_price = new_plan.price
+    db.commit()
+    return {"message": "Subscription updated successfully."}
+
+### **Refund Management**
+@router.post("/refund", response_model=dict)
+async def request_refund(
+    refund_request: RefundRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """
-    Cancel the user's subscription plan.
-    """
-    logger.info(f"Cancelling subscription for user ID {current_user.id}")
-    try:
-        cancel_user_subscription(current_user.id, db)
-        logger.info(f"Subscription cancelled successfully for user ID {current_user.id}")
-        return {"message": "Subscription cancelled successfully."}
-    except Exception as e:
-        logger.exception(f"Error cancelling subscription: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to cancel subscription.")
+    """ Process a refund via Stripe. """
+    payment = db.query(Payment).filter(Payment.id == refund_request.payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment record not found.")
 
-
-@router.get("/sessions", response_model=list[UserSession])
-async def get_user_sessions(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
-):
-    """
-    Fetch the current user's active sessions.
-    """
-    logger.info(f"Fetching sessions for user ID {current_user.id}")
-    try:
-        sessions = fetch_user_sessions(current_user.id, db)
-        return sessions
-    except Exception as e:
-        logger.exception(f"Error fetching sessions: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch sessions.")
+    stripe.Refund.create(payment_intent=payment.stripe_payment_id)
+    payment.status = "REFUNDED"
+    db.commit()
+    return {"message": "Refund processed successfully."}
