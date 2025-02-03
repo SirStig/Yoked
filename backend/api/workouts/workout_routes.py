@@ -7,22 +7,22 @@ from backend.api.workouts.workout_service import (
     update_workout,
     delete_workout,
 )
-from backend.schemas.workout_schema import WorkoutCreate, WorkoutResponse
+from backend.schemas.workout_schema import WorkoutCreate, WorkoutOut
 
 router = APIRouter()
 
-@router.post("/", response_model=WorkoutResponse)
+@router.post("/", response_model=WorkoutOut)
 def create_new_workout(workout_data: WorkoutCreate, db: Session = Depends(get_db)):
     return create_workout(db, workout_data)
 
-@router.get("/{workout_id}", response_model=WorkoutResponse)
+@router.get("/{workout_id}", response_model=WorkoutOut)
 def get_workout(workout_id: int, db: Session = Depends(get_db)):
     workout = get_workout_by_id(db, workout_id)
     if not workout:
         raise HTTPException(status_code=404, detail="Workout not found")
     return workout
 
-@router.put("/{workout_id}", response_model=WorkoutResponse)
+@router.put("/{workout_id}", response_model=WorkoutOut)
 def update_existing_workout(workout_id: int, workout_data: WorkoutCreate, db: Session = Depends(get_db)):
     updated_workout = update_workout(db, workout_id, workout_data)
     if not updated_workout:
