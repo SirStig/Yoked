@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.services.session_service import validate_session
-from backend.schemas.session_schema import UserSession
+from backend.models.session import SessionModel
 from backend.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -33,12 +33,14 @@ EXCLUDED_ROUTES = [
 
 class MFAMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        logger.debug(f"Processing MFA validation for: {request.url.path}")
+        logger.debug(f"Processing request to: {request.url.path}")
 
+        # Skip middleware for excluded routes
         if any(request.url.path.startswith(route) for route in EXCLUDED_ROUTES):
-            logger.debug(f"Skipping MFA check for: {request.url.path}")
+            logger.debug(f"Skipping MFA check for route: {request.url.path}")
             return await call_next(request)
 
+        # Extract session token from the Authorization header
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             logger.warning("Missing or malformed Authorization header")
@@ -46,19 +48,19 @@ class MFAMiddleware(BaseHTTPMiddleware):
 
         token = auth_header.split(" ")[1]
 
+        # Validate session and check MFA
         db = next(get_db())
         try:
-            session: UserSession = validate_session(token, db)
+            session: SessionModel = validate_session(token, db)
             if not session.mfa_verified:
                 logger.warning(f"MFA not verified for session: {session.id}")
                 return JSONResponse({"detail": "MFA verification required"}, status_code=403)
-
             logger.info(f"Session {session.id} passed MFA verification")
         except HTTPException as e:
             logger.error(f"MFA validation failed: {str(e)}")
             return JSONResponse({"detail": f"MFA validation failed: {e.detail}"}, status_code=403)
         except Exception as e:
-            logger.error(f"Unexpected MFA middleware error: {str(e)}")
+            logger.error(f"Unexpected error in MFA middleware: {str(e)}")
             return JSONResponse({"detail": "Unexpected error in middleware"}, status_code=500)
         finally:
             db.close()

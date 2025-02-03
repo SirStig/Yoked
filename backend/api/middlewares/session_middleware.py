@@ -4,10 +4,12 @@ from backend.services.session_service import validate_session
 from backend.core.database import get_db
 from backend.core.logging_config import get_logger
 
+# Logger setup
 logger = get_logger(__name__)
 
 class SessionValidationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
+        # Allow OPTIONS requests to pass through
         if request.method == "OPTIONS":
             return await call_next(request)
 
