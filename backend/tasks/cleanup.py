@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from backend.core.database import SessionLocal
 from backend.models.payment import Payment, PaymentStatus
-from backend.models.session import Session as UserSession
+from backend.models.session import SessionModel as UserSession
 from backend.core.logging_config import get_logger
 import stripe
 from backend.core.config import settings

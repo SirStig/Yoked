@@ -16,6 +16,19 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Declarative base for models
 Base = declarative_base()
 
+from backend.models.notifications import *
+from backend.models.reels import *
+from backend.models.tags import *
+from backend.models.workout import *
+from backend.models.nutrition import *
+from backend.models.community_post import *
+from backend.models.private_messaging import *
+from backend.models.gamification import *
+from backend.models.payment import *
+from backend.models.session import *
+from backend.models.subscription_tier import *
+from backend.models.user import *
+
 # Dependency for production database session
 def get_db():
     db = SessionLocal()

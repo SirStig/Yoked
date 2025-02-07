@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from pydantic import BaseModel, Field, EmailStr, UUID4, PositiveInt, PositiveFloat
+from pydantic import BaseModel, Field, EmailStr, UUID4, PositiveInt, PositiveFloat, constr
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -84,6 +84,10 @@ class UserOut(UserBase):
     profile_version: int
     user_type: UserType
     joined_at: datetime
+    full_name: Optional[str] = Field(None, description="Full name of the user")
+    username: str = Field(..., description="Username of the user")
+    email: EmailStr = Field(..., description="Email of the user")
+    setup_step: Optional[SetupStep] = Field(SetupStep.email_verification)
     friends: List[UUID4] = Field(default_factory=list, description="List of friend IDs")
     followers: List[UUID4] = Field(default_factory=list, description="List of follower IDs")
     following: List[UUID4] = Field(default_factory=list, description="List of users this user is following")
@@ -95,6 +99,15 @@ class UserOut(UserBase):
     mfa_enabled: bool = Field(..., description="Indicates if MFA is enabled")
     mfa_secret: Optional[str] = Field(None, description="MFA secret key for TOTP")
     mfa_backup_codes: Optional[List[str]] = Field(None, description="Backup codes for MFA")
+    height: Optional[float] = Field(None, description="User's height")
+    weight: Optional[float] = Field(None, description="User's weight")
+    height_unit: Optional[str] = Field("ft/in", description="Unit for height")
+    weight_unit: Optional[str] = Field("lbs", description="Unit for weight")
+    age: Optional[PositiveInt] = Field(None, description="Age of the user")
+    gender: Optional[str] = Field(None, description="Gender of the user")
+    bio: Optional[str] = Field(None, description="Bio of the user")
+    profile_picture: Optional[str] = Field(None, description="URL of the user's profile picture")
+    fitness_goals: Optional[str] = Field(None, description="Fitness goals of the user")
 
     class Config:
         from_attributes = True
@@ -153,3 +166,30 @@ class UserProfileUpdate(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SecuritySettings(BaseModel):
+    """
+    Schema for updating user security settings (MFA, session settings).
+    """
+    enable_mfa: Optional[bool] = None
+
+class PasswordChange(BaseModel):
+    """
+    Schema for changing a user's password.
+    """
+    current_password: constr(min_length=8)
+    new_password: constr(min_length=8)
+
+class PrivacySettings(BaseModel):
+    """
+    Schema for updating user privacy settings.
+    """
+    profile_visibility: Optional[str] = "public"  # Options: public, friends-only, private
+    reels_visibility: Optional[str] = "public"
+    comments_visibility: Optional[str] = "public"
+
+class EmailUpdateRequest(BaseModel):
+    """
+    Schema for initiating an email update (verification required).
+    """
+    new_email: EmailStr

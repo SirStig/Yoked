@@ -181,37 +181,75 @@ const AccountCreation = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const newErrors = {};
+  const getDeviceDetails = async () => {
+  try {
+    const device_type = /Mobi|Android/i.test(navigator.userAgent) ? "Mobile" : "Desktop";
+    const device_os = navigator.platform || "Unknown";
+    const browser = navigator.userAgent || "Unknown";
 
-    if (formData.email !== formData.verify_email) newErrors.email = "Emails do not match.";
-    if (formData.password !== formData.verify_password) newErrors.password = "Passwords do not match.";
-    if (!formData.accepted_terms_and_privacy) newErrors.terms = "You must accept the terms to proceed.";
+    // Fetch public IP
+    const ipResponse = await fetch("https://api.ipify.org?format=json");
+    const { ip } = await ipResponse.json();
 
-    setErrors(newErrors);
+    // Fetch location based on IP
+    const locationResponse = await fetch(`https://ipapi.co/${ip}/json/`);
+    const locationData = await locationResponse.json();
 
-    if (Object.keys(newErrors).length > 0) return;
+    return {
+      device_type,
+      device_os,
+      browser,
+      ip_address: ip || "Unknown",
+      location: locationData.city ? `${locationData.city}, ${locationData.region}, ${locationData.country_name}` : "Unknown",
+    };
+  } catch (error) {
+    console.error("Error fetching IP/Location:", error);
+    return {
+      device_type: /Mobi|Android/i.test(navigator.userAgent) ? "Mobile" : "Desktop",
+      device_os: navigator.platform || "Unknown",
+      browser: navigator.userAgent || "Unknown",
+      ip_address: "Unknown",
+      location: "Unknown",
+    };
+  }
+};
 
-    setIsLoading(true);
 
-    try {
-      await register({
-        username: formData.username,
-        full_name: formData.full_name,
-        email: formData.email,
-        hashed_password: formData.password,
-        accepted_terms: true,
-        accepted_privacy_policy: true,
-      });
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  const newErrors = {};
 
-      toast.success("Account created successfully! Please verify your email.");
-    } catch (error) {
-      toast.error(error.message || "Registration failed. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  if (formData.email !== formData.verify_email) newErrors.email = "Emails do not match.";
+  if (formData.password !== formData.verify_password) newErrors.password = "Passwords do not match.";
+  if (!formData.accepted_terms_and_privacy) newErrors.terms = "You must accept the terms to proceed.";
+
+  setErrors(newErrors);
+
+  if (Object.keys(newErrors).length > 0) return;
+
+  setIsLoading(true);
+
+  try {
+    const deviceDetails = await getDeviceDetails();
+
+    await register({
+      username: formData.username,
+      full_name: formData.full_name,
+      email: formData.email,
+      hashed_password: formData.password,
+      accepted_terms: true,
+      accepted_privacy_policy: true,
+      ...deviceDetails, // Send device details
+    });
+
+    toast.success("Account created successfully! Please verify your email.");
+  } catch (error) {
+    toast.error(error.message || "Registration failed. Please try again.");
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   return (
     <OverlayContainer>

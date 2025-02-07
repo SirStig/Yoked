@@ -1,23 +1,20 @@
-"""seeding
+"""Seed subscription tiers
 
-Revision ID: 723789b3cbe7
-Revises: ee7edd5e9fe0
-Create Date: 2025-01-19 14:56:54.720898
-
+Revision ID: 201c764921b0
+Revises: 617332bb9b1a
+Create Date: 2025-02-02 22:03:54.467366
 """
-import uuid
-from typing import Sequence, Union
 
+from typing import Sequence, Union
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy import text
+from sqlalchemy.sql import text
+import uuid
 
 # revision identifiers, used by Alembic.
-revision: str = '723789b3cbe7'
-down_revision: Union[str, None] = 'ee7edd5e9fe0'
+revision: str = "201c764921b0"
+down_revision: Union[str, None] = "617332bb9b1a"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
-
 
 def upgrade():
     # Insert subscription tiers
@@ -28,6 +25,8 @@ def upgrade():
             "id": str(uuid.uuid4()),
             "name": "Starter",
             "price": 0,
+            "currency": "USD",
+            "recurring_interval": "monthly",
             "features": [
                 'Limited access to "Yoked Reels" with ads.',
                 "Basic workout routines with ads.",
@@ -60,11 +59,14 @@ def upgrade():
             "max_reel_uploads": -1,
             "max_saved_workouts": -1,
             "max_messages_per_day": -1,
+            "version": 1,
         },
         {
             "id": str(uuid.uuid4()),
             "name": "Champion",
             "price": 999,
+            "currency": "USD",
+            "recurring_interval": "monthly",
             "features": [
                 'Ad-free access to "Yoked Reels" and workout videos.',
                 "Expanded workout library with goal-specific filters.",
@@ -99,11 +101,14 @@ def upgrade():
             "max_reel_uploads": -1,
             "max_saved_workouts": -1,
             "max_messages_per_day": -1,
+            "version": 1,
         },
         {
             "id": str(uuid.uuid4()),
             "name": "Olympian",
             "price": 1999,
+            "currency": "USD",
+            "recurring_interval": "monthly",
             "features": [
                 "Everything in Champion.",
                 "Personalized workout plans tailored to your goals.",
@@ -139,6 +144,7 @@ def upgrade():
             "max_reel_uploads": -1,
             "max_saved_workouts": -1,
             "max_messages_per_day": -1,
+            "version": 1,
         },
     ]
 
@@ -147,21 +153,23 @@ def upgrade():
             text(
                 """
                 INSERT INTO subscription_tiers (
-                    id, name, price, features, is_active, has_ads, access_reels, reels_ad_free,
-                    access_workouts, workout_filters, access_community_read, access_community_post,
-                    private_community_challenges, access_nutrition, calorie_tracking, personalized_nutrition,
-                    direct_messaging, basic_progress_tracking, enhanced_progress_tracking, access_live_classes,
-                    one_on_one_coaching, priority_support, is_hidden, is_trial_available, trial_period_days,
-                    billing_cycle, cancellation_policy, max_reel_uploads, max_saved_workouts, max_messages_per_day,
-                    created_at, updated_at
+                    id, name, price, currency, recurring_interval, features, is_active, has_ads, 
+                    access_reels, reels_ad_free, access_workouts, workout_filters, 
+                    access_community_read, access_community_post, private_community_challenges, 
+                    access_nutrition, calorie_tracking, personalized_nutrition, direct_messaging, 
+                    basic_progress_tracking, enhanced_progress_tracking, access_live_classes, 
+                    one_on_one_coaching, priority_support, is_hidden, is_trial_available, trial_period_days, 
+                    billing_cycle, cancellation_policy, max_reel_uploads, max_saved_workouts, 
+                    max_messages_per_day, version, created_at, updated_at
                 ) VALUES (
-                    :id, :name, :price, :features, :is_active, :has_ads, :access_reels, :reels_ad_free,
-                    :access_workouts, :workout_filters, :access_community_read, :access_community_post,
-                    :private_community_challenges, :access_nutrition, :calorie_tracking, :personalized_nutrition,
-                    :direct_messaging, :basic_progress_tracking, :enhanced_progress_tracking, :access_live_classes,
-                    :one_on_one_coaching, :priority_support, :is_hidden, :is_trial_available, :trial_period_days,
-                    :billing_cycle, :cancellation_policy, :max_reel_uploads, :max_saved_workouts, :max_messages_per_day,
-                    NOW(), NOW()
+                    :id, :name, :price, :currency, :recurring_interval, :features, :is_active, :has_ads, 
+                    :access_reels, :reels_ad_free, :access_workouts, :workout_filters, 
+                    :access_community_read, :access_community_post, :private_community_challenges, 
+                    :access_nutrition, :calorie_tracking, :personalized_nutrition, :direct_messaging, 
+                    :basic_progress_tracking, :enhanced_progress_tracking, :access_live_classes, 
+                    :one_on_one_coaching, :priority_support, :is_hidden, :is_trial_available, :trial_period_days, 
+                    :billing_cycle, :cancellation_policy, :max_reel_uploads, :max_saved_workouts, 
+                    :max_messages_per_day, :version, NOW(), NOW()
                 )
                 """
             ),

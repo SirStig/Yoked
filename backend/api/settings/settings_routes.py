@@ -2,152 +2,65 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.api.auth.auth_service import get_current_user
+from backend.api.settings.settings_service import SettingsService
 from backend.models.user import User
-from backend.schemas.user_schema import NotificationPreferences, UserProfileUpdate
-from backend.services.mfa import reset_mfa
-from backend.core.logging_config import get_logger
-from backend.schemas.payment_schema import SubscriptionDetails, UpdateSubscription
-from backend.services.session_service import fetch_user_sessions
-from backend.api.subscriptions.subscription_service import update_user_subscription, cancel_user_subscription
+from backend.schemas.user_schema import (
+    UserProfileUpdate, SecuritySettings, PasswordChange, PrivacySettings, EmailUpdateRequest
+)
+from backend.schemas.subscription_tier_schema import SubscriptionDetails, UpdateSubscription
 from backend.schemas.session_schema import UserSession
+from backend.schemas.notifications_schema import NotificationPreferences
+from backend.core.logging_config import get_logger
 
-# Logger setup
 logger = get_logger(__name__)
 
-# Router setup
-router = APIRouter(prefix="/api/settings", tags=["Settings"])
+router = APIRouter()
 
-
-@router.get("/notifications", response_model=NotificationPreferences)
-async def get_notification_preferences(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
-):
-    """
-    Fetch the current user's notification preferences.
-    """
-    logger.info(f"Fetching notification preferences for user ID {current_user.id}")
-    try:
-        return {
-            "email_notifications": current_user.email_notifications,
-            "push_notifications": current_user.push_notifications,
-        }
-    except Exception as e:
-        logger.exception(f"Error fetching notification preferences: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch notification preferences.")
-
-
-@router.put("/notifications", response_model=dict)
-async def update_notification_preferences(
-    preferences: NotificationPreferences,
+### **Profile Management**
+@router.put("/profile", response_model=dict)
+async def update_profile(
+    profile_data: UserProfileUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Update the user's notification preferences.
+    Update user profile details (name, bio, height, weight, fitness goals, etc.).
     """
-    logger.info(f"Updating notification preferences for user ID {current_user.id}")
-    try:
-        current_user.email_notifications = preferences.email_notifications
-        current_user.push_notifications = preferences.push_notifications
-        db.commit()
+    return SettingsService.update_profile(db, current_user, profile_data)
 
-        logger.info(f"Notification preferences updated for user ID {current_user.id}")
-        return {"message": "Notification preferences updated successfully."}
-    except Exception as e:
-        logger.exception(f"Error updating notification preferences: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to update notification preferences.")
-
-
-@router.put("/reset-mfa", response_model=dict)
-async def reset_mfa_route(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
-):
-    """
-    Reset the user's MFA setup.
-    """
-    logger.info(f"Resetting MFA for user ID {current_user.id}")
-    try:
-        reset_mfa(current_user.id, db)
-        logger.info(f"MFA reset successfully for user ID {current_user.id}")
-        return {"message": "MFA reset successfully. Please set up MFA again."}
-    except Exception as e:
-        logger.exception(f"Error resetting MFA: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to reset MFA.")
-
-
-@router.delete("/account", response_model=dict)
-async def delete_account(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
-):
-    """
-    Delete the user's account.
-    """
-    logger.info(f"Deleting account for user ID {current_user.id}")
-    try:
-        db.delete(current_user)
-        db.commit()
-
-        logger.info(f"Account deleted for user ID {current_user.id}")
-        return {"message": "Account deleted successfully."}
-    except Exception as e:
-        logger.exception(f"Error deleting account: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to delete account.")
-
-
-@router.get("/subscription", response_model=SubscriptionDetails)
-async def get_subscription_details(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
-):
-    """
-    Fetch the current user's subscription details.
-    """
-    logger.info(f"Fetching subscription details for user ID {current_user.id}")
-    try:
-        return {
-            "subscription_name": current_user.subscription_plan,
-            "price": current_user.subscription_price,
-            "status": current_user.subscription_status,
-        }
-    except Exception as e:
-        logger.exception(f"Error fetching subscription details: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch subscription details.")
-
-
-@router.put("/subscription", response_model=dict)
-async def update_subscription(
-    subscription_data: UpdateSubscription,
+@router.put("/email", response_model=dict)
+async def update_email(
+    email_data: EmailUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Update the user's subscription plan.
+    Update user email (requires email verification).
     """
-    logger.info(f"Updating subscription for user ID {current_user.id}")
-    try:
-        update_user_subscription(current_user.id, subscription_data, db)
-        logger.info(f"Subscription updated successfully for user ID {current_user.id}")
-        return {"message": "Subscription updated successfully."}
-    except Exception as e:
-        logger.exception(f"Error updating subscription: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to update subscription.")
+    return SettingsService.update_email(db, current_user, email_data)
 
-
-@router.delete("/subscription", response_model=dict)
-async def cancel_subscription(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+### **Security & Authentication**
+@router.put("/password", response_model=dict)
+async def change_password(
+    password_data: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
-    Cancel the user's subscription plan.
+    Change user password (requires OTP or current password verification).
     """
-    logger.info(f"Cancelling subscription for user ID {current_user.id}")
-    try:
-        cancel_user_subscription(current_user.id, db)
-        logger.info(f"Subscription cancelled successfully for user ID {current_user.id}")
-        return {"message": "Subscription cancelled successfully."}
-    except Exception as e:
-        logger.exception(f"Error cancelling subscription: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to cancel subscription.")
+    return SettingsService.change_password(db, current_user, password_data)
 
+@router.put("/mfa", response_model=dict)
+async def toggle_mfa(
+    enable_mfa: bool,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Enable or disable MFA for user security.
+    """
+    return SettingsService.toggle_mfa(db, current_user, enable_mfa)
 
 @router.get("/sessions", response_model=list[UserSession])
 async def get_user_sessions(
@@ -156,10 +69,137 @@ async def get_user_sessions(
     """
     Fetch the current user's active sessions.
     """
-    logger.info(f"Fetching sessions for user ID {current_user.id}")
-    try:
-        sessions = fetch_user_sessions(current_user.id, db)
-        return sessions
-    except Exception as e:
-        logger.exception(f"Error fetching sessions: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch sessions.")
+    return SettingsService.fetch_sessions(db, current_user)
+
+@router.delete("/sessions/{session_id}", response_model=dict)
+async def revoke_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Revoke a specific session (logout from a device).
+    """
+    return SettingsService.revoke_session(db, current_user, session_id)
+
+### **Subscription Management**
+@router.get("/subscription", response_model=SubscriptionDetails)
+async def get_subscription_details(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """
+    Fetch the user's current subscription details.
+    """
+    return SettingsService.get_subscription(db, current_user)
+
+@router.put("/subscription", response_model=dict)
+async def update_subscription(
+    subscription_data: UpdateSubscription,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update the user's subscription plan (Stripe, Apple, or Google).
+    """
+    return SettingsService.update_subscription(db, current_user, subscription_data)
+
+@router.delete("/subscription", response_model=dict)
+async def cancel_subscription(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """
+    Cancel the user's subscription (Stripe, Apple, Google).
+    Requires password verification.
+    """
+    return SettingsService.cancel_subscription(db, current_user)
+
+### **Notification Preferences**
+@router.get("/notifications", response_model=NotificationPreferences)
+async def get_notification_preferences(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """
+    Fetch the current user's notification preferences.
+    """
+    return SettingsService.get_notifications(db, current_user)
+
+@router.put("/notifications", response_model=dict)
+async def update_notification_preferences(
+    preferences: NotificationPreferences,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update the user's notification preferences (email & push notifications for likes, comments, follows, etc.).
+    """
+    return SettingsService.update_notifications(db, current_user, preferences)
+
+### **Privacy Settings**
+@router.put("/privacy", response_model=dict)
+async def update_privacy_settings(
+    privacy_settings: PrivacySettings,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update privacy settings for the user (who can see profile, reels, posts).
+    """
+    return SettingsService.update_privacy(db, current_user, privacy_settings)
+
+### **Reels & Community Post Settings**
+@router.put("/reels", response_model=dict)
+async def update_reels_settings(
+    reels_settings: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update reels settings (privacy, auto-moderation).
+    """
+    return SettingsService.update_reels_settings(db, current_user, reels_settings)
+
+@router.put("/community", response_model=dict)
+async def update_community_settings(
+    community_settings: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update community post settings (visibility, flagged content settings).
+    """
+    return SettingsService.update_community_settings(db, current_user, community_settings)
+
+### **Nutrition & Workout Preferences**
+@router.put("/nutrition", response_model=dict)
+async def update_nutrition_settings(
+    nutrition_settings: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update nutrition settings (dietary preferences, calorie tracking).
+    """
+    return SettingsService.update_nutrition_settings(db, current_user, nutrition_settings)
+
+@router.put("/workout", response_model=dict)
+async def update_workout_settings(
+    workout_settings: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update workout settings (activity level, progress tracking).
+    """
+    return SettingsService.update_workout_settings(db, current_user, workout_settings)
+
+### **Account Deletion**
+@router.delete("/account", response_model=dict)
+async def delete_account(
+    password: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete the user's account permanently (requires password verification & subscription cancellation).
+    """
+    return SettingsService.delete_account(db, current_user, password)

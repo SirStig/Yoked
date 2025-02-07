@@ -1,8 +1,8 @@
-"""Changed Enumsadwdwdwddwqdwfw
+"""Fix Notification foreign keys
 
-Revision ID: eef99f9ec2a6
-Revises: 68074a181da1
-Create Date: 2025-01-19 22:02:55.596469
+Revision ID: 617332bb9b1a
+Revises: 582c600c8a40
+Create Date: 2025-02-02 21:51:45.203656
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'eef99f9ec2a6'
-down_revision: Union[str, None] = '68074a181da1'
+revision: str = '617332bb9b1a'
+down_revision: Union[str, None] = '582c600c8a40'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

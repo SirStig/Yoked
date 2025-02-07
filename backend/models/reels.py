@@ -1,3 +1,5 @@
+import enum
+
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Boolean, Table, UUID, func
 from sqlalchemy.orm import relationship
 from backend.core.database import Base
@@ -22,7 +24,6 @@ reel_bookmarks = Table(
     Column("reel_id", UUID, ForeignKey("reels.id"), primary_key=True),
 )
 
-
 class Reel(Base):
     __tablename__ = "reels"
 
@@ -43,7 +44,6 @@ class Reel(Base):
 
     # Ad system (For free users)
     is_advertisement = Column(Boolean, default=False)  # Determines if reel is an ad
-    advertiser_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)  # Link to advertiser account
 
     # Hashtags & Categories
     tags = relationship("Tag", secondary=reel_tags, back_populates="reels")

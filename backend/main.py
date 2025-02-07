@@ -16,6 +16,7 @@ from backend.api.workouts.workout_routes import router as workout_router
 from backend.api.payments.webhooks.stripe_webhook import router as stripe_webhook
 from backend.api.subscriptions.subscription_routes import router as subscription_router
 from backend.api.admin.admin_routes import router as admin_router
+from backend.api.settings.settings_routes import router as settings_router
 from backend.api.middlewares.session_middleware import SessionValidationMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from backend.core.database import init_db, get_db, engine
@@ -64,11 +65,11 @@ except Exception as e:
     logger.error(f"Failed to add session middleware: {e}")
 
 # Middleware: MFA Validation
-try:
-    app.add_middleware(MFAMiddleware)
-    logger.info("MFA validation middleware added.")
-except Exception as e:
-    logger.error(f"Failed to add mfa middleware: {e}")
+#try:
+#    app.add_middleware(MFAMiddleware)
+#    logger.info("MFA validation middleware added.")
+#except Exception as e:
+#    logger.error(f"Failed to add mfa middleware: {e}")
 
 # Middleware: Admin Validation
 try:
@@ -137,6 +138,12 @@ try:
     logger.info("Admin router registered.")
 except Exception as e:
     logger.error(f"Failed to register Admin router: {e}")
+
+try:
+    app.include_router(settings_router, prefix="/api/settings", tags=["UserSettings"])
+    logger.info("User Settings router registered.")
+except Exception as e:
+    logger.error(f"Failed to register User Settings router: {e}")
 
 # Startup Event
 redis_server = None

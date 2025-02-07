@@ -6,10 +6,12 @@ import uuid
 from enum import Enum as PyEnum
 
 from backend.models.community_post import post_likes, post_bookmarks
+from backend.models.notifications import Notification
 from backend.models.private_messaging import group_chat_participants
 from backend.models.reels import reel_likes, reel_bookmarks
 from backend.models.workout import workout_bookmarks
 from backend.models.nutrition import saved_meal_plans
+
 
 
 class ActivityLevel(PyEnum):
@@ -121,7 +123,7 @@ class User(Base):
     chats = relationship("Chat", secondary=group_chat_participants, back_populates="participants")
     messages_sent = relationship("Message", back_populates="sender", cascade="all, delete-orphan")
     typing_status = relationship("TypingStatus", back_populates="user", cascade="all, delete-orphan")
-    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    notifications = relationship("Notification", back_populates="user", foreign_keys=[Notification.user_id], cascade="all, delete-orphan")
     achievements = relationship("UserAchievement", back_populates="user", cascade="all, delete-orphan")
     level = relationship("UserLevel", back_populates="user", cascade="all, delete-orphan")
     leaderboard = relationship("Leaderboard", back_populates="user", cascade="all, delete-orphan")

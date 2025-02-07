@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import styled, { css } from "styled-components";
 import { toast } from "react-toastify";
 import { verifyPayment } from "../api/paymentApi";
-import { AuthContext } from "../contexts/AuthContext"; // Import AuthContext
+import { AuthContext } from "../contexts/AuthContext";
 
 // Styled Components
 const Container = styled.div`
@@ -11,12 +11,24 @@ const Container = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  height: 100vh;
+  text-align: center;
+  background: ${({ theme }) => theme.colors.background};
+`;
+
+const Card = styled.div`
+  background: ${({ theme }) => theme.colors.secondary};
+  padding: 2rem;
+  box-shadow: ${({ theme }) => theme.shadows.medium};
+  border-radius: ${({ theme }) => theme.borderRadius.large};
+  max-width: 500px;
+  width: 90%;
   text-align: center;
 `;
 
 const Message = styled.h1`
-  font-size: 2rem;
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
   ${(props) =>
     props.success
       ? css`
@@ -28,14 +40,16 @@ const Message = styled.h1`
 `;
 
 const Button = styled.button`
-  padding: 10px 20px;
+  padding: 12px 24px;
   background-color: ${({ theme }) => theme.colors.primary};
   color: ${({ theme }) => theme.colors.textPrimary};
   border: none;
   border-radius: ${({ theme }) => theme.borderRadius};
   cursor: pointer;
   margin-top: 20px;
-  transition: background-color 0.3s;
+  font-size: 1rem;
+  font-weight: bold;
+  transition: background-color 0.3s ease-in-out;
 
   &:hover {
     background-color: ${({ theme }) => theme.colors.primaryHover};
@@ -44,17 +58,17 @@ const Button = styled.button`
 
 const PaymentSuccess = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [success, setSuccess] = useState(null); // Set as `null` to handle initial loading
+  const [success, setSuccess] = useState(null);
   const [message, setMessage] = useState("Verifying payment...");
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { loadUser } = useContext(AuthContext); // Access loadUser from AuthContext
+  const { loadUser } = useContext(AuthContext);
 
   useEffect(() => {
     const verifyPaymentSession = async () => {
       const sessionId = searchParams.get("session_id");
 
-      if (!sessionId || typeof sessionId !== "string") {
+      if (!sessionId) {
         setMessage("Invalid session ID. Unable to verify payment.");
         setSuccess(false);
         setIsLoading(false);
@@ -62,13 +76,15 @@ const PaymentSuccess = () => {
       }
 
       try {
+        console.log(`Verifying payment with session ID: ${sessionId}`);
         const response = await verifyPayment(sessionId);
         setMessage(response.message || "Payment verified successfully!");
         setSuccess(true);
 
-        // Reload the user profile after a successful payment verification
-        await loadUser(true); // Force the user profile to reload
+        // Reload user profile after successful verification
+        await loadUser(true);
       } catch (error) {
+        console.error("Payment verification failed:", error);
         setMessage(error.message || "Payment verification failed. Please try again.");
         setSuccess(false);
       } finally {
@@ -77,28 +93,30 @@ const PaymentSuccess = () => {
     };
 
     verifyPaymentSession();
-  }, [searchParams, loadUser]); // Make sure loadUser is part of the dependency array
+  }, [searchParams, loadUser]);
 
   const handleRedirect = () => {
     if (success) {
-      navigate("/dashboard"); // Redirect to dashboard
+      navigate("/dashboard");
     } else {
-      navigate("/dashboard", { state: { overlay: "subscriptionSelection" } }); // Retry subscription in overlay
+      navigate("/dashboard", { state: { overlay: "subscriptionSelection" } });
     }
   };
 
   return (
     <Container>
-      {isLoading ? (
-        <Message>Loading...</Message>
-      ) : (
-        <>
-          <Message success={success}>{message}</Message>
-          <Button onClick={handleRedirect}>
-            {success ? "Go to Dashboard" : "Retry Subscription"}
-          </Button>
-        </>
-      )}
+      <Card>
+        {isLoading ? (
+          <Message>Loading...</Message>
+        ) : (
+          <>
+            <Message success={success}>{message}</Message>
+            <Button onClick={handleRedirect}>
+              {success ? "Go to Dashboard" : "Retry Subscription"}
+            </Button>
+          </>
+        )}
+      </Card>
     </Container>
   );
 };

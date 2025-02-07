@@ -13,6 +13,7 @@ from backend.models.payment import Payment, PaymentPlatform, PaymentStatus
 from backend.models.user import User
 from backend.schemas.payment_schema import PaymentCreate, PaymentVerify, PaymentHistory, AdminPaymentHistory
 from backend.core.config import settings
+from backend.schemas.subscription_tier_schema import UpdateSubscription
 
 logger = get_logger(__name__)
 
@@ -20,17 +21,17 @@ logger = get_logger(__name__)
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
-def create_stripe_payment(user: User, subscription_tier_id: str, db: Session) -> dict:
+def create_stripe_payment(user: User, subscription_id: str, db: Session) -> dict:
     """
     Creates a Stripe Checkout session for a user based on subscription tier ID.
     """
-    logger.info(f"Creating Stripe payment for user {user.id}, subscription tier ID: {subscription_tier_id}")
+    logger.info(f"Creating Stripe payment for user {user.id}, subscription tier ID: {subscription_id}")
     try:
         # Fetch the subscription tier
-        tier = db.query(SubscriptionTier).filter_by(id=subscription_tier_id).first()
+        tier = db.query(SubscriptionTier).filter_by(id=subscription_id).first()
         if not tier:
-            logger.error(f"Subscription tier {subscription_tier_id} not found.")
-            raise ValueError(f"Invalid subscription tier ID: {subscription_tier_id}")
+            logger.error(f"Subscription tier {subscription_id} not found.")
+            raise ValueError(f"Invalid subscription tier ID: {subscription_id}")
 
         # Validate tier details
         if not tier.price or not tier.currency or not tier.recurring_interval:
@@ -135,7 +136,7 @@ def create_payment(db: Session, payment_data: PaymentCreate, user_id: UUID) -> P
             platform=payment_data.platform.value,
             amount=payment_data.amount,
             currency=payment_data.currency,
-            subscription_tier_id=payment_data.subscription_tier_id,
+            subscription_id=payment_data.subscription_id,
             renewal_date=payment_data.renewal_date,
             status=PaymentStatus.PENDING.value.upper(),
             timestamp=datetime.utcnow(),
@@ -233,12 +234,10 @@ def refund_payment(payment_id: str, db: Session) -> Payment:
         db.rollback()
         raise HTTPException(status_code=500, detail="Error processing refund")
 
-
-def get_user_payments(
-        user_id: uuid.UUID, page: int, page_size: int, db: Session
-) -> PaymentHistory:
+def get_user_payments(user_id: uuid.UUID, page: int, page_size: int, db: Session) -> PaymentHistory:
     """
     Fetch paginated payment history for a user.
+    Ensures values are properly cast to enums before returning.
     """
     logger.info(f"Fetching payment history for user ID: {user_id}")
     try:
@@ -251,6 +250,11 @@ def get_user_payments(
             .all()
         )
 
+        # Convert Enums to Strings
+        for payment in payments:
+            payment.platform = payment.platform.name  # Convert Enum to String
+            payment.status = payment.status.name  # Convert Enum to String
+
         return PaymentHistory(
             total=total_payments,
             payments=[payment for payment in payments],
@@ -258,6 +262,12 @@ def get_user_payments(
     except SQLAlchemyError as e:
         logger.error(f"Error fetching payments for user {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Error fetching payment history")
+    except ValueError as e:
+        logger.error(f"Invalid payment data format for user {user_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Invalid payment data format")
+
+
+
 
 
 def get_all_payments(page: int, page_size: int, db: Session) -> AdminPaymentHistory:
@@ -282,3 +292,66 @@ def get_all_payments(page: int, page_size: int, db: Session) -> AdminPaymentHist
     except SQLAlchemyError as e:
         logger.error(f"Error fetching all payments: {str(e)}")
         raise HTTPException(status_code=500, detail="Error fetching payment records")
+
+def cancel_subscription_stripe(user: User, subscription, db: Session):
+    """
+    Cancels a user's Stripe subscription.
+    """
+    logger.info(f"Canceling Stripe subscription for user {user.id}")
+
+    if not subscription.stripe_payment_id:
+        raise HTTPException(status_code=400, detail="No active Stripe subscription found.")
+
+    try:
+        stripe.Subscription.modify(
+            subscription.stripe_payment_id, cancel_at_period_end=True
+        )
+        subscription.status = PaymentStatus.CANCELED
+        db.commit()
+        return {"message": "Subscription cancellation initiated. Your plan will remain active until the end of the billing cycle."}
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe cancellation error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to cancel subscription.")
+
+
+def update_subscription_stripe(user: User, subscription, update_data: UpdateSubscription, db: Session):
+    """
+    Updates a user's Stripe subscription (upgrades/downgrades).
+    Charges only the difference if within 16 days of the last payment.
+    """
+    logger.info(f"Updating Stripe subscription for user {user.id}")
+
+    if not subscription.stripe_payment_id:
+        raise HTTPException(status_code=400, detail="No active Stripe subscription found.")
+
+    try:
+        # Fetch new subscription tier details
+        new_tier = db.query(SubscriptionTier).filter_by(id=update_data.new_tier_id).first()
+        if not new_tier:
+            raise HTTPException(status_code=404, detail="New subscription tier not found.")
+
+        # Get the current Stripe subscription
+        stripe_subscription = stripe.Subscription.retrieve(subscription.stripe_payment_id)
+
+        # Determine if user is within 16 days of last payment
+        last_payment_time = datetime.utcfromtimestamp(stripe_subscription.current_period_start)
+        days_since_payment = (datetime.utcnow() - last_payment_time).days
+        prorate = days_since_payment < 16  # Charge only the difference if true
+
+        stripe.Subscription.modify(
+            subscription.stripe_payment_id,
+            items=[{
+                "id": stripe_subscription.items.data[0].id,
+                "price": new_tier.stripe_price_id,
+            }],
+            proration_behavior="create_prorations" if prorate else "none"
+        )
+
+        subscription.subscription_tier_id = new_tier.id
+        subscription.status = PaymentStatus.ACTIVE
+        db.commit()
+
+        return {"message": "Subscription updated successfully."}
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe update error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update subscription.")

@@ -177,9 +177,35 @@ const Header = () => {
     }
   };
 
-  const handleDashboardNavigation = (overlay) => {
-    navigate("/dashboard", { state: { overlay: overlay || "login" } });
+  const handleDashboardNavigation = () => {
+    if (!currentUser) {
+      navigate("/dashboard", { state: { overlay: "login" } });
+      return;
+    }
+
+    console.log("Header: Navigating to dashboard with setup_step:", currentUser?.setup_step);
+
+    switch (currentUser?.setup_step) {
+      case "profile_completion":
+        navigate("/dashboard", { state: { overlay: "profileCompletion" } });
+        break;
+      case "subscription_selection":
+        navigate("/dashboard", { state: { overlay: "subscriptionSelection" } });
+        break;
+      default:
+        navigate("/dashboard");
+        break;
+    }
   };
+
+  const handleSettingsNavigation = () => {
+    if (!currentUser) {
+      navigate("/dashboard", { state: { overlay: "login" } });
+    } else {
+      navigate("/dashboard", { state: { overlay: "settings" } });
+    }
+  };
+
 
   return (
     <HeaderContainer isScrolled={isScrolled}>

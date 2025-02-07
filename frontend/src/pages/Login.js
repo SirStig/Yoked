@@ -75,21 +75,71 @@ const LinkText = styled.p`
   }
 `;
 
+const StyledError = styled.p`
+  color: ${({ theme }) => theme.colors.error || "red"};
+  font-size: 0.9rem;
+  margin-top: -0.5rem;
+`;
+
+
+// Function to fetch device details
+const getDeviceDetails = async () => {
+  try {
+    const device_type = /Mobi|Android/i.test(navigator.userAgent) ? "Mobile" : "Desktop";
+    const device_os = navigator.platform || "Unknown";
+    const browser = navigator.userAgent || "Unknown";
+
+    // Fetch public IP
+    const ipResponse = await fetch("https://api.ipify.org?format=json");
+    const { ip } = await ipResponse.json();
+
+    // Fetch location based on IP
+    const locationResponse = await fetch(`https://ipapi.co/${ip}/json/`);
+    const locationData = await locationResponse.json();
+
+    return {
+      device_type,
+      device_os,
+      browser,
+      ip_address: ip || "Unknown",
+      location: locationData.city ? `${locationData.city}, ${locationData.region}, ${locationData.country_name}` : "Unknown",
+    };
+  } catch (error) {
+    console.error("Error fetching IP/Location:", error);
+    return {
+      device_type: /Mobi|Android/i.test(navigator.userAgent) ? "Mobile" : "Desktop",
+      device_os: navigator.platform || "Unknown",
+      browser: navigator.userAgent || "Unknown",
+      ip_address: "Unknown",
+      location: "Unknown",
+    };
+  }
+};
+
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const { login } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage(""); // Clear previous errors
 
     try {
-      await login(email, password);
+      const deviceDetails = await getDeviceDetails();
+      await login(email, password, deviceDetails);
       toast.success("Login successful!");
     } catch (error) {
-      toast.error(error.message || "Login failed. Please try again.");
+      console.error("Login Error:", error);
+
+      if (error?.message) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage("Login failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -117,6 +167,7 @@ const Login = () => {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
+        {errorMessage && <StyledError>{errorMessage}</StyledError>}
         <Button type="submit" disabled={isLoading}>
           {isLoading ? "Logging in..." : "Login"}
         </Button>

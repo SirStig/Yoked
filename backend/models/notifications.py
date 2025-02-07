@@ -1,33 +1,34 @@
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, Boolean, UUID, func
+from sqlalchemy import Column, String, Text, ForeignKey, DateTime, Boolean, UUID
 from sqlalchemy.orm import relationship
 from backend.core.database import Base
 import uuid
 from datetime import datetime
 
-
 class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+
+    # User receiving the notification
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user = relationship("User", back_populates="notifications", foreign_keys=[user_id])
 
-    type = Column(String, nullable=False)  # e.g., "message", "friend_request", "like", "comment", "system"
-    content = Column(Text, nullable=False)  # e.g., "John liked your post."
+    # User who triggered the notification (e.g., who liked the post)
+    related_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    related_user = relationship("User", foreign_keys=[related_user_id])
 
-    related_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"),
-                             nullable=True)  # User who triggered the notification
-    related_post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"),
-                             nullable=True)  # Post related to the notification
-    related_reel_id = Column(UUID(as_uuid=True), ForeignKey("reels.id"),
-                             nullable=True)  # Reel related to the notification
-    related_workout_id = Column(UUID(as_uuid=True), ForeignKey("workouts.id"),
-                                nullable=True)  # Workout related to the notification
+    type = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
 
-    is_read = Column(Boolean, default=False)  # Tracks if the user has seen the notification
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    user = relationship("User", back_populates="notifications")
-    related_user = relationship("User", foreign_keys=[related_user_id])  # User who triggered the action
+    # Related objects (only one will be filled depending on type)
+    related_post_id = Column(UUID(as_uuid=True), ForeignKey("posts.id"), nullable=True)
     related_post = relationship("Post")
+
+    related_reel_id = Column(UUID(as_uuid=True), ForeignKey("reels.id"), nullable=True)
     related_reel = relationship("Reel")
+
+    related_workout_id = Column(UUID(as_uuid=True), ForeignKey("workouts.id"), nullable=True)
     related_workout = relationship("Workout")
+
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

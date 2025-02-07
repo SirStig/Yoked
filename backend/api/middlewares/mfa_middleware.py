@@ -29,6 +29,19 @@ EXCLUDED_ROUTES = [
     "/api/admin/login",
     "/api/admin/mfa/setup",
     "/api/admin/mfa/verify",
+    "/api/settings/profile",
+    "/api/settings/email",
+    "/api/settings/password",
+    "/api/settings/mfa",
+    "/api/settings/sessions",
+    "/api/settings/subscription",
+    "/api/settings/notifications",
+    "/api/settings/privacy",
+    "/api/settings/reels",
+    "/api/settings/community",
+    "/api/settings/nutrition",
+    "/api/settings/workout",
+    "/api/settings/account",
 ]
 
 class MFAMiddleware(BaseHTTPMiddleware):

@@ -9,8 +9,8 @@ from backend.models.user import User
 from backend.services.session_service import (
     create_session,
     validate_session,
-    invalidate_session,
-    invalidate_specific_session,
+    deactivate_session,
+    deactivate_specific_session,
 )
 from backend.core.config import settings
 from backend.schemas.user_schema import UserCreate, UserType, SetupStep
@@ -173,7 +173,7 @@ def admin_required(
 
 def logout_user(token: str, db: Session):
     try:
-        invalidate_specific_session(token, db)
+        deactivate_specific_session(token, db)
         logger.info("User logged out successfully")
     except Exception as e:
         logger.exception("Error logging out user")
@@ -182,7 +182,7 @@ def logout_user(token: str, db: Session):
 
 def logout_all_sessions(user_id: int, db: Session):
     try:
-        invalidate_session(user_id, db)
+        deactivate_session(user_id, db)
         logger.info(f"All sessions invalidated for user ID: {user_id}")
     except Exception as e:
         logger.exception("Error logging out all sessions")

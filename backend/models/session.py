@@ -16,6 +16,7 @@ class SessionModel(Base):
     expires_at = Column(DateTime, nullable=False)
     is_mobile = Column(Boolean, default=False, nullable=False)
     mfa_verified = Column(Boolean, default=False)  # Tracks if session was MFA verified
+    is_active = Column(Boolean, default=True, nullable=False)
 
     # Device & Security Tracking
     device_type = Column(String, nullable=True)  # e.g., "iPhone", "Windows PC"

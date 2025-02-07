@@ -11,6 +11,7 @@ class UserSession(BaseModel):
     expires_at: datetime = Field(..., description="Time the session expires")
     is_mobile: bool = Field(..., description="Indicates if the session is from a mobile device")
     mfa_verified: bool = Field(..., description="Indicates if the session is MFA verified")
+    is_active: bool = Field(..., description="Indicates if the session is active")
 
     # Device Information
     device_type: Optional[str] = Field(None, description="Type of device used for the session (e.g., mobile, desktop)")

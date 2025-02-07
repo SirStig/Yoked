@@ -20,3 +20,14 @@ class NotificationOut(NotificationBase):
 
     class Config:
         from_attributes = True
+
+class NotificationPreferences(BaseModel):
+    """
+    Schema for updating user notification preferences.
+    """
+    likes: Optional[bool] = True
+    comments: Optional[bool] = True
+    follows: Optional[bool] = True
+    direct_messages: Optional[bool] = True
+    subscriptions: Optional[bool] = True
+    marketing: Optional[bool] = True

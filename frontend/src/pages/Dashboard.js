@@ -48,7 +48,9 @@ const fadeIn = keyframes`
 `;
 
 // Styled Components
-const DashboardContainer = styled.div`
+const DashboardContainer = styled.div.withConfig({
+  shouldForwardProp: (prop) => !["isBlurred"].includes(prop),
+})`
   display: flex;
   height: 100vh;
   background-color: ${({ theme }) => theme.colors.secondary};
@@ -72,7 +74,9 @@ const Sidebar = styled.div`
   animation: ${fadeIn} 0.5s ease-in-out;
 `;
 
-const SidebarItem = styled.div`
+const SidebarItem = styled.div.withConfig({
+  shouldForwardProp: (prop) => !["active"].includes(prop),
+})`
   display: flex;
   align-items: center;
   gap: 0.9rem;
@@ -86,7 +90,7 @@ const SidebarItem = styled.div`
   transition: transform 0.2s ease-in-out;
 
   &:hover {
-    transform: scale(1.05); 
+    transform: scale(1.05);
   }
 
   svg {
@@ -94,7 +98,9 @@ const SidebarItem = styled.div`
   }
 `;
 
-const MoreDropdown = styled.div`
+const MoreDropdown = styled.div.withConfig({
+  shouldForwardProp: (prop) => !["isOpen"].includes(prop),
+})`
   position: absolute;
   width: 200px;
   background-color: ${({ theme }) => theme.components.dropdown.background};
@@ -201,13 +207,40 @@ const Dashboard = () => {
   const location = useLocation();
 
   useEffect(() => {
+    console.log("Dashboard: Checking overlay state...");
+
+    if (location.state?.overlay) {
+      console.log("Dashboard: Overlay state received:", location.state.overlay);
+      setActiveOverlay(location.state.overlay);
+    } else if (currentUser?.setup_step) {
+      console.log("Dashboard: Verifying setup_step:", currentUser.setup_step);
+
+      switch (currentUser.setup_step) {
+        case "profile_completion":
+          setActiveOverlay("profileCompletion");
+          break;
+        case "subscription_selection":
+          setActiveOverlay("subscriptionSelection");
+          break;
+        default:
+          setActiveOverlay(null); // No overlay needed
+          break;
+      }
+    } else {
+      setActiveOverlay("login"); // If user is not logged in, default to login overlay
+    }
+  }, [location.state, currentUser]);
+
+
+
+  useEffect(() => {
     const positionDropdown = () => {
       if (isMoreOpen && moreRef.current && dropdownRef.current) {
         const buttonRect = moreRef.current.getBoundingClientRect();
         const dropdownElement = dropdownRef.current;
 
-        dropdownElement.style.top = `${buttonRect.top - dropdownElement.offsetHeight - 8}px`; // Adjust position to appear above the button
-        dropdownElement.style.left = `${buttonRect.left}px`; // Align horizontally with the button
+        dropdownElement.style.top = `${buttonRect.top - dropdownElement.offsetHeight - 8}px`;
+        dropdownElement.style.left = `${buttonRect.left}px`;
       }
     };
 
@@ -218,6 +251,7 @@ const Dashboard = () => {
       window.removeEventListener("resize", positionDropdown);
     };
   }, [isMoreOpen]);
+
 
   const handleLogout = async () => {
     await logout();
@@ -251,35 +285,35 @@ const Dashboard = () => {
       <DashboardContainer isBlurred={!!activeOverlay}>
         <Sidebar>
           <h1>Yoked</h1>
-          <SidebarItem active={activeTab === "home"} onClick={() => setActiveTab("home")}>
+          <SidebarItem active={activeTab === "home" ? "true" : "false"} onClick={() => setActiveTab("home")}>
             <FaHome />
             Home
           </SidebarItem>
-          <SidebarItem active={activeTab === "reels"} onClick={() => setActiveTab("reels")}>
+          <SidebarItem active={activeTab === "reels" ? "true" : "false"} onClick={() => setActiveTab("reels")}>
             <FaVideo />
             Yoked Reels
           </SidebarItem>
-          <SidebarItem active={activeTab === "search"} onClick={() => setActiveTab("search")}>
+          <SidebarItem active={activeTab === "search" ? "true" : "false"} onClick={() => setActiveTab("search")}>
             <FaSearch />
             Search
           </SidebarItem>
-          <SidebarItem active={activeTab === "notifications"} onClick={() => setActiveTab("notifications")}>
+          <SidebarItem active={activeTab === "notifications" ? "true" : "false"} onClick={() => setActiveTab("notifications")}>
             <FaBell />
             Notifications
           </SidebarItem>
-          <SidebarItem active={activeTab === "health"} onClick={() => setActiveTab("health")}>
+          <SidebarItem active={activeTab === "health" ? "true" : "false"} onClick={() => setActiveTab("health")}>
             <FaHeart />
             Health
           </SidebarItem>
-          <SidebarItem active={activeTab === "workouts"} onClick={() => setActiveTab("workouts")}>
+          <SidebarItem active={activeTab === "workouts" ? "true" : "false"} onClick={() => setActiveTab("workouts")}>
             <FaDumbbell />
             Workouts
           </SidebarItem>
-          <SidebarItem active={activeTab === "messages"} onClick={() => setActiveTab("messages")}>
+          <SidebarItem active={activeTab === "messages" ? "true" : "false"} onClick={() => setActiveTab("messages")}>
             <FaEnvelope />
             Messages
           </SidebarItem>
-          <ProfileButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")}>
+          <ProfileButton active={activeTab === "profile" ? "true" : "false"} onClick={() => setActiveTab("profile")}>
             <img src={currentUser?.avatar || "/assets/default-avatar.png"} alt="User Avatar" />
             Profile
           </ProfileButton>

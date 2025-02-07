@@ -116,6 +116,13 @@ export const theme = {
     overlay: {
       background: "rgba(0, 0, 0, 0.8)", // Dark overlay
     },
+    MuiTypography: {
+      styleOverrides: {
+        root: {
+          color: "white",
+        },
+      },
+    },
   },
 
   animations: {

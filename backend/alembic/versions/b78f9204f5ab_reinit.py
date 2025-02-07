@@ -1,8 +1,8 @@
-"""Breaking Changes in Models
+"""Reinit
 
-Revision ID: f50997feeff7
-Revises: d7f0f5523210
-Create Date: 2025-01-30 22:28:18.699452
+Revision ID: b78f9204f5ab
+Revises: 
+Create Date: 2025-02-02 21:38:43.452677
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'f50997feeff7'
-down_revision: Union[str, None] = 'd7f0f5523210'
+revision: str = 'b78f9204f5ab'
+down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -41,10 +41,87 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_meal_plans_id'), 'meal_plans', ['id'], unique=False)
+    op.create_table('subscription_tiers',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('price', sa.Integer(), nullable=False),
+    sa.Column('features', sa.ARRAY(sa.String()), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('currency', sa.String(), nullable=False),
+    sa.Column('recurring_interval', sa.String(), nullable=False),
+    sa.Column('has_ads', sa.Boolean(), nullable=True),
+    sa.Column('access_reels', sa.Boolean(), nullable=True),
+    sa.Column('reels_ad_free', sa.Boolean(), nullable=True),
+    sa.Column('access_workouts', sa.Boolean(), nullable=True),
+    sa.Column('workout_filters', sa.Boolean(), nullable=True),
+    sa.Column('access_community_read', sa.Boolean(), nullable=True),
+    sa.Column('access_community_post', sa.Boolean(), nullable=True),
+    sa.Column('private_community_challenges', sa.Boolean(), nullable=True),
+    sa.Column('access_nutrition', sa.Boolean(), nullable=True),
+    sa.Column('calorie_tracking', sa.Boolean(), nullable=True),
+    sa.Column('personalized_nutrition', sa.Boolean(), nullable=True),
+    sa.Column('direct_messaging', sa.Boolean(), nullable=True),
+    sa.Column('basic_progress_tracking', sa.Boolean(), nullable=True),
+    sa.Column('enhanced_progress_tracking', sa.Boolean(), nullable=True),
+    sa.Column('access_live_classes', sa.Boolean(), nullable=True),
+    sa.Column('one_on_one_coaching', sa.Boolean(), nullable=True),
+    sa.Column('priority_support', sa.Boolean(), nullable=True),
+    sa.Column('is_hidden', sa.Boolean(), nullable=True),
+    sa.Column('is_trial_available', sa.Boolean(), nullable=True),
+    sa.Column('trial_period_days', sa.Integer(), nullable=True),
+    sa.Column('billing_cycle', sa.String(), nullable=True),
+    sa.Column('cancellation_policy', sa.String(), nullable=True),
+    sa.Column('max_reel_uploads', sa.Integer(), nullable=True),
+    sa.Column('max_saved_workouts', sa.Integer(), nullable=True),
+    sa.Column('max_messages_per_day', sa.Integer(), nullable=True),
+    sa.Column('version', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('name')
+    )
     op.create_table('tags',
     sa.Column('tag', sa.String(), nullable=False),
     sa.PrimaryKeyConstraint('tag')
     )
+    op.create_table('users',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('full_name', sa.String(), nullable=False),
+    sa.Column('username', sa.String(), nullable=False),
+    sa.Column('email', sa.String(), nullable=False),
+    sa.Column('hashed_password', sa.String(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('is_verified', sa.Boolean(), nullable=True),
+    sa.Column('bio', sa.Text(), nullable=True),
+    sa.Column('profile_picture', sa.String(), nullable=True),
+    sa.Column('fitness_goals', sa.String(), nullable=True),
+    sa.Column('subscription_plan', sa.String(), nullable=True),
+    sa.Column('setup_step', sa.Enum('email_verification', 'profile_completion', 'subscription_selection', 'completed', name='setupstep'), nullable=True),
+    sa.Column('joined_at', sa.DateTime(), nullable=True),
+    sa.Column('user_type', sa.Enum('REGULAR', 'ADMIN', name='usertype'), nullable=False),
+    sa.Column('admin_secret_key', sa.String(), nullable=True),
+    sa.Column('flagged_for_review', sa.Boolean(), nullable=True),
+    sa.Column('age', sa.Integer(), nullable=True),
+    sa.Column('gender', sa.String(), nullable=True),
+    sa.Column('activity_level', sa.Enum('sedentary', 'lightly_active', 'active', 'very_active', name='activitylevel'), nullable=True),
+    sa.Column('height', sa.String(), nullable=True),
+    sa.Column('weight', sa.String(), nullable=True),
+    sa.Column('height_unit', sa.String(), nullable=True),
+    sa.Column('weight_unit', sa.String(), nullable=True),
+    sa.Column('profile_version', sa.Integer(), nullable=False),
+    sa.Column('accepted_terms', sa.Boolean(), nullable=False),
+    sa.Column('accepted_privacy_policy', sa.Boolean(), nullable=False),
+    sa.Column('accepted_terms_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('accepted_privacy_policy_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('mfa_enabled', sa.Boolean(), nullable=True),
+    sa.Column('mfa_secret', sa.String(), nullable=True),
+    sa.Column('mfa_backup_codes', sa.ARRAY(sa.String()), nullable=True),
+    sa.Column('email_notifications', sa.Boolean(), nullable=False),
+    sa.Column('push_notifications', sa.Boolean(), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+    op.create_index(op.f('ix_users_username'), 'users', ['username'], unique=True)
     op.create_table('workouts',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('title', sa.String(), nullable=False),
@@ -152,12 +229,10 @@ def upgrade() -> None:
     sa.Column('comments_count', sa.Integer(), nullable=True),
     sa.Column('views_count', sa.Integer(), nullable=True),
     sa.Column('is_advertisement', sa.Boolean(), nullable=True),
-    sa.Column('advertiser_id', sa.UUID(), nullable=True),
     sa.Column('is_reported', sa.Boolean(), nullable=True),
     sa.Column('visibility', sa.String(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['advertiser_id'], ['users.id'], ),
     sa.ForeignKeyConstraint(['author_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -169,6 +244,26 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('user_id', 'meal_plan_id')
     )
+    op.create_table('sessions',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('token', sa.String(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('expires_at', sa.DateTime(), nullable=False),
+    sa.Column('is_mobile', sa.Boolean(), nullable=False),
+    sa.Column('mfa_verified', sa.Boolean(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('device_type', sa.String(), nullable=True),
+    sa.Column('device_os', sa.String(), nullable=True),
+    sa.Column('browser', sa.String(), nullable=True),
+    sa.Column('location', sa.String(), nullable=True),
+    sa.Column('ip_address', sa.String(), nullable=True),
+    sa.Column('last_activity', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_sessions_token'), 'sessions', ['token'], unique=True)
+    op.create_index(op.f('ix_sessions_user_id'), 'sessions', ['user_id'], unique=False)
     op.create_table('typing_status',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('chat_id', sa.UUID(), nullable=False),
@@ -252,6 +347,24 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_comments_id'), 'comments', ['id'], unique=False)
+    op.create_table('payments',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('subscription_id', sa.UUID(), nullable=True),
+    sa.Column('stripe_payment_id', sa.String(), nullable=True),
+    sa.Column('google_payment_id', sa.String(), nullable=True),
+    sa.Column('apple_payment_id', sa.String(), nullable=True),
+    sa.Column('amount', sa.Integer(), nullable=False),
+    sa.Column('currency', sa.String(), nullable=False),
+    sa.Column('platform', sa.Enum('STRIPE', 'GOOGLE', 'APPLE', name='paymentplatform'), nullable=False),
+    sa.Column('status', sa.Enum('PENDING', 'SUCCESS', 'FAILED', 'PAID', 'COMPLETE', name='paymentstatus'), nullable=False),
+    sa.Column('renewal_date', sa.DateTime(), nullable=True),
+    sa.Column('timestamp', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['subscription_id'], ['user_subscriptions.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_payments_id'), 'payments', ['id'], unique=False)
     op.create_table('post_bookmarks',
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('post_id', sa.UUID(), nullable=False),
@@ -329,39 +442,11 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_reported_reels_id'), 'reported_reels', ['id'], unique=False)
-    op.drop_table('user_friends')
-    op.add_column('payments', sa.Column('subscription_id', sa.UUID(), nullable=True))
-    op.drop_constraint('payments_subscription_tier_id_fkey', 'payments', type_='foreignkey')
-    op.create_foreign_key(None, 'payments', 'user_subscriptions', ['subscription_id'], ['id'])
-    op.drop_column('payments', 'subscription_tier_id')
-    op.add_column('sessions', sa.Column('device_os', sa.String(), nullable=True))
-    op.add_column('sessions', sa.Column('browser', sa.String(), nullable=True))
-    op.alter_column('sessions', 'user_id',
-               existing_type=sa.UUID(),
-               nullable=False)
-    op.create_index(op.f('ix_sessions_user_id'), 'sessions', ['user_id'], unique=False)
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index(op.f('ix_sessions_user_id'), table_name='sessions')
-    op.alter_column('sessions', 'user_id',
-               existing_type=sa.UUID(),
-               nullable=True)
-    op.drop_column('sessions', 'browser')
-    op.drop_column('sessions', 'device_os')
-    op.add_column('payments', sa.Column('subscription_tier_id', sa.UUID(), autoincrement=False, nullable=False))
-    op.drop_constraint(None, 'payments', type_='foreignkey')
-    op.create_foreign_key('payments_subscription_tier_id_fkey', 'payments', 'subscription_tiers', ['subscription_tier_id'], ['id'])
-    op.drop_column('payments', 'subscription_id')
-    op.create_table('user_friends',
-    sa.Column('user_id', sa.UUID(), autoincrement=False, nullable=False),
-    sa.Column('friend_id', sa.UUID(), autoincrement=False, nullable=False),
-    sa.ForeignKeyConstraint(['friend_id'], ['users.id'], name='user_friends_friend_id_fkey'),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name='user_friends_user_id_fkey'),
-    sa.PrimaryKeyConstraint('user_id', 'friend_id', name='user_friends_pkey')
-    )
     op.drop_index(op.f('ix_reported_reels_id'), table_name='reported_reels')
     op.drop_table('reported_reels')
     op.drop_index(op.f('ix_reported_posts_id'), table_name='reported_posts')
@@ -374,6 +459,8 @@ def downgrade() -> None:
     op.drop_table('post_tags')
     op.drop_table('post_likes')
     op.drop_table('post_bookmarks')
+    op.drop_index(op.f('ix_payments_id'), table_name='payments')
+    op.drop_table('payments')
     op.drop_index(op.f('ix_comments_id'), table_name='comments')
     op.drop_table('comments')
     op.drop_table('workout_tags')
@@ -387,6 +474,9 @@ def downgrade() -> None:
     op.drop_table('user_followers')
     op.drop_index(op.f('ix_typing_status_id'), table_name='typing_status')
     op.drop_table('typing_status')
+    op.drop_index(op.f('ix_sessions_user_id'), table_name='sessions')
+    op.drop_index(op.f('ix_sessions_token'), table_name='sessions')
+    op.drop_table('sessions')
     op.drop_table('saved_meal_plans')
     op.drop_index(op.f('ix_reels_id'), table_name='reels')
     op.drop_table('reels')
@@ -402,7 +492,11 @@ def downgrade() -> None:
     op.drop_table('friend_requests')
     op.drop_index(op.f('ix_workouts_id'), table_name='workouts')
     op.drop_table('workouts')
+    op.drop_index(op.f('ix_users_username'), table_name='users')
+    op.drop_index(op.f('ix_users_email'), table_name='users')
+    op.drop_table('users')
     op.drop_table('tags')
+    op.drop_table('subscription_tiers')
     op.drop_index(op.f('ix_meal_plans_id'), table_name='meal_plans')
     op.drop_table('meal_plans')
     op.drop_index(op.f('ix_chats_id'), table_name='chats')
